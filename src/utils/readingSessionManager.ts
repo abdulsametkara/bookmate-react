@@ -1,0 +1,259 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export interface ReadingSession {
+  id: string;
+  userId: string;
+  bookId: string;
+  startTime: string;
+  endTime?: string;
+  duration: number; // in minutes
+  pagesRead: number;
+  startPage: number;
+  endPage: number;
+  date: string; // YYYY-MM-DD format
+}
+
+export interface ReadingStats {
+  totalMinutesRead: number;
+  totalPagesRead: number;
+  totalSessions: number;
+  averageSessionDuration: number;
+  booksStarted: number;
+  booksCompleted: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastReadDate: string;
+}
+
+class ReadingSessionManager {
+  private static STORAGE_KEY = 'bookmate_reading_sessions';
+
+  // Start a reading session
+  static async startSession(userId: string, bookId: string, startPage: number): Promise<string> {
+    try {
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const session: ReadingSession = {
+        id: sessionId,
+        userId,
+        bookId,
+        startTime: new Date().toISOString(),
+        duration: 0,
+        pagesRead: 0,
+        startPage,
+        endPage: startPage,
+        date: new Date().toISOString().split('T')[0],
+      };
+
+      const sessions = await this.getAllSessions();
+      sessions.push(session);
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions));
+      
+      return sessionId;
+    } catch (error) {
+      console.error('Error starting reading session:', error);
+      throw error;
+    }
+  }
+
+  // End a reading session
+  static async endSession(sessionId: string, endPage: number): Promise<void> {
+    try {
+      const sessions = await this.getAllSessions();
+      const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+      
+      if (sessionIndex !== -1) {
+        const session = sessions[sessionIndex];
+        const endTime = new Date();
+        const startTime = new Date(session.startTime);
+        const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // in minutes
+        
+        sessions[sessionIndex] = {
+          ...session,
+          endTime: endTime.toISOString(),
+          duration,
+          endPage,
+          pagesRead: Math.max(0, endPage - session.startPage),
+        };
+
+        await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions));
+      }
+    } catch (error) {
+      console.error('Error ending reading session:', error);
+      throw error;
+    }
+  }
+
+  // Get all sessions
+  static async getAllSessions(): Promise<ReadingSession[]> {
+    try {
+      const sessionsData = await AsyncStorage.getItem(this.STORAGE_KEY);
+      return sessionsData ? JSON.parse(sessionsData) : [];
+    } catch (error) {
+      console.error('Error getting reading sessions:', error);
+      return [];
+    }
+  }
+
+  // Get sessions for a specific user
+  static async getUserSessions(userId: string): Promise<ReadingSession[]> {
+    try {
+      const allSessions = await this.getAllSessions();
+      return allSessions.filter(session => session.userId === userId);
+    } catch (error) {
+      console.error('Error getting user sessions:', error);
+      return [];
+    }
+  }
+
+  // Get sessions for a specific book
+  static async getBookSessions(bookId: string): Promise<ReadingSession[]> {
+    try {
+      const allSessions = await this.getAllSessions();
+      return allSessions.filter(session => session.bookId === bookId);
+    } catch (error) {
+      console.error('Error getting book sessions:', error);
+      return [];
+    }
+  }
+
+  // Calculate reading statistics for a user
+  static async getUserStats(userId: string): Promise<ReadingStats> {
+    try {
+      const sessions = await this.getUserSessions(userId);
+      const completedSessions = sessions.filter(s => s.endTime);
+
+      if (completedSessions.length === 0) {
+        return {
+          totalMinutesRead: 0,
+          totalPagesRead: 0,
+          totalSessions: 0,
+          averageSessionDuration: 0,
+          booksStarted: 0,
+          booksCompleted: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          lastReadDate: '',
+        };
+      }
+
+      const totalMinutesRead = completedSessions.reduce((sum, s) => sum + s.duration, 0);
+      const totalPagesRead = completedSessions.reduce((sum, s) => sum + s.pagesRead, 0);
+      const averageSessionDuration = Math.round(totalMinutesRead / completedSessions.length);
+
+      // Count unique books
+      const uniqueBooks = new Set(sessions.map(s => s.bookId));
+      const booksStarted = uniqueBooks.size;
+
+      // Calculate streaks
+      const { currentStreak, longestStreak } = this.calculateStreaks(completedSessions);
+
+      // Get last read date
+      const lastSession = completedSessions
+        .sort((a, b) => new Date(b.endTime || b.startTime).getTime() - new Date(a.endTime || a.startTime).getTime())[0];
+      const lastReadDate = lastSession ? lastSession.date : '';
+
+      return {
+        totalMinutesRead,
+        totalPagesRead,
+        totalSessions: completedSessions.length,
+        averageSessionDuration,
+        booksStarted,
+        booksCompleted: 0, // Will be calculated from book completion status
+        currentStreak,
+        longestStreak,
+        lastReadDate,
+      };
+    } catch (error) {
+      console.error('Error calculating user stats:', error);
+      return {
+        totalMinutesRead: 0,
+        totalPagesRead: 0,
+        totalSessions: 0,
+        averageSessionDuration: 0,
+        booksStarted: 0,
+        booksCompleted: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastReadDate: '',
+      };
+    }
+  }
+
+  // Calculate reading streaks
+  private static calculateStreaks(sessions: ReadingSession[]): { currentStreak: number; longestStreak: number } {
+    if (sessions.length === 0) return { currentStreak: 0, longestStreak: 0 };
+
+    // Group sessions by date
+    const sessionsByDate = sessions.reduce((acc, session) => {
+      const date = session.date;
+      if (!acc[date]) acc[date] = [];
+      acc[date].push(session);
+      return acc;
+    }, {} as Record<string, ReadingSession[]>);
+
+    const uniqueDates = Object.keys(sessionsByDate).sort();
+    
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+
+    // Calculate current streak (from today backwards)
+    const today = new Date().toISOString().split('T')[0];
+    let checkDate = new Date(today);
+    
+    while (true) {
+      const dateStr = checkDate.toISOString().split('T')[0];
+      if (sessionsByDate[dateStr]) {
+        currentStreak++;
+      } else {
+        break;
+      }
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    // Calculate longest streak
+    for (let i = 0; i < uniqueDates.length; i++) {
+      if (i === 0 || this.isConsecutiveDay(uniqueDates[i-1], uniqueDates[i])) {
+        tempStreak++;
+        longestStreak = Math.max(longestStreak, tempStreak);
+      } else {
+        tempStreak = 1;
+      }
+    }
+
+    return { currentStreak, longestStreak };
+  }
+
+  // Check if two dates are consecutive
+  private static isConsecutiveDay(date1: string, date2: string): boolean {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    const diffTime = d2.getTime() - d1.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays === 1;
+  }
+
+  // Clear all sessions (for testing or reset)
+  static async clearAllSessions(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(this.STORAGE_KEY);
+    } catch (error) {
+      console.error('Error clearing sessions:', error);
+      throw error;
+    }
+  }
+
+  // Delete sessions for a specific user
+  static async deleteUserSessions(userId: string): Promise<void> {
+    try {
+      const allSessions = await this.getAllSessions();
+      const filteredSessions = allSessions.filter(session => session.userId !== userId);
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(filteredSessions));
+    } catch (error) {
+      console.error('Error deleting user sessions:', error);
+      throw error;
+    }
+  }
+}
+
+export default ReadingSessionManager; 
