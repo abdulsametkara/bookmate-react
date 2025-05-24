@@ -50,6 +50,7 @@ const MainTabNavigator: React.FC = () => {
         component={HomeScreen}
         options={{
           title: 'Ana Sayfa',
+          headerShown: false, // Kendi header tasarımımız olduğu için gizliyoruz
           tabBarIcon: ({ color, size }) => (
             <Icon name="home-outline" color={color} size={size} />
           ),

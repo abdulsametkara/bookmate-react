@@ -19,6 +19,8 @@ import { Book, BookStatus } from '../models';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
+import { loadBooks, setBooks } from '../store/bookSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void; viewMode: string }) => {
   const [imageLoading, setImageLoading] = useState(true);
@@ -165,10 +167,12 @@ const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void
 
 const LibraryScreen = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Hepsi');
   const [viewMode, setViewMode] = useState('grid'); // grid or list
   const [refreshKey, setRefreshKey] = useState(0); // Add this to force refresh
+  const [isLoading, setIsLoading] = useState(false);
 
   // Redux ile kitapları al
   const reduxBooks = useSelector((state: RootState) => state.books.items);
@@ -203,6 +207,26 @@ const LibraryScreen = () => {
     };
   }
 
+  // AsyncStorage'dan kitapları yükle
+  const loadBooksFromStorage = async () => {
+    if (!currentUserId) return;
+    
+    setIsLoading(true);
+    try {
+      const storedBooks = await loadBooks(currentUserId);
+      console.log('LibraryScreen loading books:', {
+        userId: currentUserId,
+        bookCount: storedBooks.length,
+        books: storedBooks.map(b => ({ id: b.id, title: b.title, currentPage: b.currentPage, progress: b.progress }))
+      });
+      dispatch(setBooks(storedBooks));
+    } catch (error) {
+      console.error('Error loading books in LibraryScreen:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Arama fonksiyonu
   const onChangeSearch = (query) => setSearchQuery(query);
 
@@ -234,12 +258,13 @@ const LibraryScreen = () => {
     });
   };
 
-  // Status değişikliğini dinle
+  // Status değişikliğini dinle ve veri yükle
   useFocusEffect(
     useCallback(() => {
-      // Ekran odaklandığında kitap listesini güncelle
+      // Ekran odaklandığında kitap listesini güncelle ve AsyncStorage'dan yükle
       setRefreshKey(prev => prev + 1);
-    }, [])
+      loadBooksFromStorage();
+    }, [currentUserId])
   );
 
   // 3D Kitaplık görünümüne geç

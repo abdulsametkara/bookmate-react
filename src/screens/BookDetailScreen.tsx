@@ -247,6 +247,14 @@ const BookDetailScreen = () => {
     const prevPage = book.currentPage;
     
     try {
+      console.log('saveProgress called with:', {
+        bookId: book.id,
+        currentPage,
+        prevPage,
+        currentUserId,
+        reduxBookExists: !!reduxBook
+      });
+      
       // Kitabı bul ve güncelle
       if (reduxBook) {
         // Redux kitabını güncelle
@@ -261,6 +269,15 @@ const BookDetailScreen = () => {
             : reduxBook.status,
           lastReadingDate: new Date().toISOString(),
         };
+        
+        console.log('Updating Redux book:', {
+          bookId: updatedBook.id,
+          oldCurrentPage: reduxBook.currentPage,
+          newCurrentPage: updatedBook.currentPage,
+          oldProgress: reduxBook.progress,
+          newProgress: updatedBook.progress
+        });
+        
         dispatch(updateBook(updatedBook));
         
         // AsyncStorage'a kaydet
@@ -268,7 +285,15 @@ const BookDetailScreen = () => {
           const allBooks = libraryBooks.map(b => 
             b.id === updatedBook.id ? updatedBook : b
           );
+          
+          console.log('Saving to AsyncStorage:', {
+            userId: currentUserId,
+            totalBooks: allBooks.length,
+            updatedBook: { id: updatedBook.id, currentPage: updatedBook.currentPage, progress: updatedBook.progress }
+          });
+          
           await saveBooks(allBooks, currentUserId);
+          console.log('Successfully saved to AsyncStorage');
         }
       } else if (mockBook) {
         // Mock kitabı güncelle

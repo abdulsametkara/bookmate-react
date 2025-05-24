@@ -1,20 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, Image, TouchableOpacity, SafeAreaView, Text, Dimensions, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/core';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAppSelector } from '../store';
+import { useAppSelector, useAppDispatch } from '../store';
 import UserManager, { User } from '../utils/userManager';
 import ReadingSessionManager, { ReadingStats } from '../utils/readingSessionManager';
+import { loadBooks, setBooks } from '../store/bookSlice';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = () => {
   const navigation = useNavigation();
+  const dispatch = useAppDispatch();
   const currentUserId = useAppSelector((state) => state.books.currentUserId);
   const books = useAppSelector((state) => state.books.items);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
+
+  // AsyncStorage'dan kitapları yükle
+  const loadBooksFromStorage = async () => {
+    if (!currentUserId) return;
+    
+    try {
+      const storedBooks = await loadBooks(currentUserId);
+      console.log('HomeScreen loading books:', {
+        userId: currentUserId,
+        bookCount: storedBooks.length,
+        books: storedBooks.map(b => ({ id: b.id, title: b.title, currentPage: b.currentPage, progress: b.progress }))
+      });
+      dispatch(setBooks(storedBooks));
+    } catch (error) {
+      console.error('Error loading books in HomeScreen:', error);
+    }
+  };
 
   // Load user data and reading stats
   useEffect(() => {
@@ -36,6 +56,13 @@ const HomeScreen = () => {
 
     loadData();
   }, [currentUserId]);
+
+  // Focus effect to reload books when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadBooksFromStorage();
+    }, [currentUserId])
+  );
 
   // Calculate real statistics from books and reading sessions
   const userBooks = books.filter(book => book.userId === currentUserId);

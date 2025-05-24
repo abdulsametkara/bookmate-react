@@ -9,7 +9,8 @@ import {
   Alert,
   Modal,
   FlatList,
-  Image
+  Image,
+  AppState
 } from 'react-native';
 import { Surface } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -18,10 +19,23 @@ import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import ReadingSessionManager, { ReadingStats } from '../utils/readingSessionManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Timer durumu için interface
+interface TimerState {
+  sessionSeconds: number;
+  isRunning: boolean;
+  isPaused: boolean;
+  currentSessionId: string | null;
+  startPage: number;
+  selectedBookId: string | null;
+  lastUpdateTime: string;
+}
 
 const ReadingTimerScreen = () => {
   const navigation = useNavigation();
   const intervalRef = useRef(null);
+  const appState = useRef(AppState.currentState);
   
   // Redux'tan current user ve kitapları al
   const currentUserId = useSelector((state: RootState) => state.books.currentUserId);
@@ -44,14 +58,149 @@ const ReadingTimerScreen = () => {
   const [selectedBook, setSelectedBook] = useState(null);
   const [showBookSelectionModal, setShowBookSelectionModal] = useState(false);
 
+  // AsyncStorage keys
+  const TIMER_STATE_KEY = `timer_state_${currentUserId}`;
+
+  // Load timer state from AsyncStorage
+  const loadTimerState = async () => {
+    if (!currentUserId) return;
+    
+    try {
+      const savedState = await AsyncStorage.getItem(TIMER_STATE_KEY);
+      if (savedState) {
+        const timerState: TimerState = JSON.parse(savedState);
+        console.log('Loading timer state:', timerState);
+        
+        // Calculate elapsed time since last update
+        const lastUpdateTime = new Date(timerState.lastUpdateTime);
+        const now = new Date();
+        const elapsedSeconds = Math.floor((now.getTime() - lastUpdateTime.getTime()) / 1000);
+        
+        // Find selected book
+        let book = null;
+        if (timerState.selectedBookId) {
+          book = reduxBooks.find(b => b.id === timerState.selectedBookId);
+        }
+        
+        // Restore timer state
+        setSelectedBook(book);
+        setCurrentSessionId(timerState.currentSessionId);
+        setStartPage(timerState.startPage);
+        setIsRunning(timerState.isRunning);
+        setIsPaused(timerState.isPaused);
+        
+        // Update session seconds with elapsed time if timer was running
+        if (timerState.isRunning && !timerState.isPaused) {
+          setSessionSeconds(timerState.sessionSeconds + elapsedSeconds);
+          console.log('Timer was running, adding elapsed time:', elapsedSeconds, 'seconds');
+        } else {
+          setSessionSeconds(timerState.sessionSeconds);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading timer state:', error);
+    }
+  };
+
+  // Save timer state to AsyncStorage
+  const saveTimerState = async () => {
+    if (!currentUserId) return;
+    
+    try {
+      const timerState: TimerState = {
+        sessionSeconds,
+        isRunning,
+        isPaused,
+        currentSessionId,
+        startPage,
+        selectedBookId: selectedBook?.id || null,
+        lastUpdateTime: new Date().toISOString(),
+      };
+      
+      await AsyncStorage.setItem(TIMER_STATE_KEY, JSON.stringify(timerState));
+      console.log('Timer state saved:', timerState);
+    } catch (error) {
+      console.error('Error saving timer state:', error);
+    }
+  };
+
+  // Clear timer state from AsyncStorage
+  const clearTimerState = async () => {
+    if (!currentUserId) return;
+    
+    try {
+      await AsyncStorage.removeItem(TIMER_STATE_KEY);
+      console.log('Timer state cleared');
+    } catch (error) {
+      console.error('Error clearing timer state:', error);
+    }
+  };
+
   // Load reading stats on mount
   useEffect(() => {
     loadReadingStats();
+    loadTimerState();
   }, [currentUserId]);
+
+  // Save timer state whenever it changes (but not during app state transitions)
+  const [isAppStateChanging, setIsAppStateChanging] = useState(false);
+  
+  useEffect(() => {
+    if (currentUserId && !isAppStateChanging) {
+      saveTimerState();
+    }
+  }, [sessionSeconds, isRunning, isPaused, currentSessionId, selectedBook, isAppStateChanging]);
+
+  // Handle app state changes
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState) => {
+      console.log('App state changing from', appState.current, 'to', nextAppState);
+      setIsAppStateChanging(true);
+      
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to the foreground
+        console.log('App came to foreground, reloading timer state');
+        setTimeout(() => {
+          loadTimerState().then(() => {
+            setIsAppStateChanging(false);
+          });
+        }, 100);
+      } else if (nextAppState.match(/inactive|background/)) {
+        // App is going to background - save current state immediately
+        console.log('App going to background, saving current timer state');
+        const currentTimerState: TimerState = {
+          sessionSeconds,
+          isRunning,
+          isPaused,
+          currentSessionId,
+          startPage,
+          selectedBookId: selectedBook?.id || null,
+          lastUpdateTime: new Date().toISOString(),
+        };
+        
+        AsyncStorage.setItem(TIMER_STATE_KEY, JSON.stringify(currentTimerState))
+          .then(() => {
+            console.log('Background save successful:', currentTimerState);
+            setIsAppStateChanging(false);
+          })
+          .catch(error => {
+            console.error('Background save failed:', error);
+            setIsAppStateChanging(false);
+          });
+      } else {
+        setIsAppStateChanging(false);
+      }
+      
+      appState.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [sessionSeconds, isRunning, isPaused, currentSessionId, selectedBook, startPage]);
 
   // Timer logic
   useEffect(() => {
-    if (isRunning && !isPaused) {
+    if (isRunning && !isPaused && !isAppStateChanging) {
       intervalRef.current = setInterval(() => {
         setSessionSeconds(prev => prev + 1);
       }, 1000);
@@ -66,7 +215,7 @@ const ReadingTimerScreen = () => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, isPaused]);
+  }, [isRunning, isPaused, isAppStateChanging]);
 
   const loadReadingStats = async () => {
     if (!currentUserId) return;
@@ -75,12 +224,22 @@ const ReadingTimerScreen = () => {
       const stats = await ReadingSessionManager.getUserStats(currentUserId);
       setReadingStats(stats);
 
-      // Calculate today's reading time
+      // Calculate today's reading time (completed sessions only) - duration is now in seconds
       const allSessions = await ReadingSessionManager.getUserSessions(currentUserId);
       const today = new Date().toISOString().split('T')[0];
       const todaySessions = allSessions.filter(session => session.date === today && session.endTime);
-      const todayTotal = todaySessions.reduce((sum, session) => sum + session.duration, 0);
-      setTodayMinutes(todayTotal);
+      const todayTotalSeconds = todaySessions.reduce((sum, session) => sum + session.duration, 0);
+      
+      console.log('Today\'s reading stats:', {
+        today,
+        todaySessionsCount: todaySessions.length,
+        todayTotalSeconds,
+        todayTotalMinutes: Math.round(todayTotalSeconds / 60),
+        todaySessions: todaySessions.map(s => ({ duration: s.duration, startTime: s.startTime, endTime: s.endTime }))
+      });
+      
+      // setTodayMinutes expects seconds now, so we can use todayTotalSeconds directly
+      setTodayMinutes(todayTotalSeconds);
     } catch (error) {
       console.error('Error loading reading stats:', error);
     }
@@ -122,6 +281,8 @@ const ReadingTimerScreen = () => {
       setStartPage(selectedBook.currentPage || 0);
       setIsRunning(true);
       setIsPaused(false);
+      
+      console.log('Timer started, session ID:', sessionId);
     } catch (error) {
       console.error('Error starting reading session:', error);
       Alert.alert('Hata', 'Okuma seansı başlatılamadı.');
@@ -130,82 +291,59 @@ const ReadingTimerScreen = () => {
 
   const pauseTimer = () => {
     setIsPaused(true);
+    console.log('Timer paused');
   };
 
   const resumeTimer = () => {
     setIsPaused(false);
+    console.log('Timer resumed');
   };
 
   const stopTimer = async () => {
-    if (sessionSeconds > 0 && currentSessionId) {
-      Alert.alert(
-        'Oturumu Sonlandır',
-        `Bu oturumda ${formatTime(sessionSeconds).formatted} okudunuz. Kaç sayfa okudunuz?`,
-        [
-          {
-            text: 'İptal',
-            style: 'cancel'
-          },
-          {
-            text: 'Devam',
-            onPress: () => showPageInputAlert()
-          }
-        ]
-      );
+    if (sessionSeconds > 0 && currentSessionId && selectedBook) {
+      // Timer durduğunda direkt olarak mevcut kitap sayfası ile session'ı kaydet
+      try {
+        console.log('Stopping timer and saving session');
+        
+        // Session'ı mevcut kitap sayfası ile bitir
+        await ReadingSessionManager.endSession(currentSessionId, selectedBook.currentPage || startPage, sessionSeconds);
+        
+        // Timer state'ini sıfırla
+        setIsRunning(false);
+        setIsPaused(false);
+        setSessionSeconds(0);
+        setCurrentSessionId(null);
+        
+        // AsyncStorage'dan timer state'ini temizle
+        await clearTimerState();
+        
+        // İstatistikleri yeniden yükle
+        await loadReadingStats();
+        
+        const readingMinutes = Math.round(sessionSeconds / 60);
+        const readingSeconds = sessionSeconds % 60;
+        console.log('Session finished successfully, reading time:', sessionSeconds, 'seconds (', readingMinutes, 'minutes', readingSeconds, 'seconds)');
+        
+        Alert.alert(
+          'Okuma Seansı Kaydedildi', 
+          `${formatTime(sessionSeconds).formatted} okuma süresi bugünün toplamına eklendi.`,
+          [{ text: 'Tamam' }]
+        );
+      } catch (error) {
+        console.error('Error ending reading session:', error);
+        Alert.alert('Hata', 'Okuma seansı kaydedilemedi.');
+      }
     } else {
-      setIsRunning(false);
-      setIsPaused(false);
-      setSessionSeconds(0);
-      setCurrentSessionId(null);
-    }
-  };
-
-  const showPageInputAlert = () => {
-    Alert.prompt(
-      'Okunan Sayfa Sayısı',
-      `Başlangıç: ${startPage}. Şu anda hangi sayfadasınız?`,
-      [
-        {
-          text: 'İptal',
-          style: 'cancel'
-        },
-        {
-          text: 'Tamam',
-          onPress: (endPageStr) => {
-            const endPage = parseInt(endPageStr || startPage.toString());
-            if (isNaN(endPage) || endPage < startPage) {
-              Alert.alert('Hata', 'Geçerli bir sayfa numarası girin.');
-              return;
-            }
-            finishSession(endPage);
-          }
-        }
-      ],
-      'plain-text',
-      startPage.toString()
-    );
-  };
-
-  const finishSession = async (endPage: number) => {
-    if (!currentSessionId) return;
-
-    try {
-      // End the reading session
-      await ReadingSessionManager.endSession(currentSessionId, endPage);
-      
-      // Reset timer state
+      // Session yoksa veya süre 0 ise sadece timer'ı sıfırla
+      console.log('Stopping timer and resetting state (no session to save)');
       setIsRunning(false);
       setIsPaused(false);
       setSessionSeconds(0);
       setCurrentSessionId(null);
       
-      // Reload stats
-      await loadReadingStats();
-      
-      Alert.alert('Başarılı', `Okuma seansınız kaydedildi!\n${endPage - startPage} sayfa okudunuz.`);
-    } catch (error) {
-      console.error('Error ending reading session:', error);
-      Alert.alert('Hata', 'Okuma seansı kaydedilemedi.');
+      // Clear timer state from AsyncStorage
+      await clearTimerState();
+      console.log('Timer stopped and reset');
     }
   };
 
@@ -251,6 +389,7 @@ const ReadingTimerScreen = () => {
   );
 
   const currentTime = formatTime(sessionSeconds);
+  // Bugünkü toplam süre: daha önce kaydedilen session'lar (saniye) + mevcut session (saniye)
   const todayTime = formatTime(todayMinutes + sessionSeconds);
 
   return (
@@ -364,7 +503,7 @@ const ReadingTimerScreen = () => {
               disabled={sessionSeconds === 0}
             >
               <MaterialCommunityIcons name="stop" size={18} color="#666" />
-              <Text style={styles.stopButtonText}>Durdur</Text>
+              <Text style={styles.stopButtonText}>Kaydet & Durdur</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -413,7 +552,7 @@ const ReadingTimerScreen = () => {
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Genel Toplam</Text>
               <Text style={styles.statValue}>
-                {readingStats ? formatTime(readingStats.totalMinutesRead * 60).formatted : '00:00:00'}
+                {readingStats ? formatTime(readingStats.totalSecondsRead).formatted : '00:00:00'}
               </Text>
             </View>
             
@@ -421,7 +560,7 @@ const ReadingTimerScreen = () => {
               <Text style={styles.statLabel}>Ortalama/Gün</Text>
               <Text style={styles.statValue}>
                 {readingStats && readingStats.totalSessions > 0 
-                  ? formatTime(readingStats.averageSessionDuration * 60).formatted 
+                  ? formatTime(readingStats.averageSessionDuration).formatted 
                   : '00:00:00'}
               </Text>
             </View>

@@ -6,7 +6,7 @@ export interface ReadingSession {
   bookId: string;
   startTime: string;
   endTime?: string;
-  duration: number; // in minutes
+  duration: number; // in seconds (changed from minutes)
   pagesRead: number;
   startPage: number;
   endPage: number;
@@ -15,6 +15,7 @@ export interface ReadingSession {
 
 export interface ReadingStats {
   totalMinutesRead: number;
+  totalSecondsRead: number;
   totalPagesRead: number;
   totalSessions: number;
   averageSessionDuration: number;
@@ -56,7 +57,7 @@ class ReadingSessionManager {
   }
 
   // End a reading session
-  static async endSession(sessionId: string, endPage: number): Promise<void> {
+  static async endSession(sessionId: string, endPage: number, durationInSeconds?: number): Promise<void> {
     try {
       const sessions = await this.getAllSessions();
       const sessionIndex = sessions.findIndex(s => s.id === sessionId);
@@ -65,7 +66,16 @@ class ReadingSessionManager {
         const session = sessions[sessionIndex];
         const endTime = new Date();
         const startTime = new Date(session.startTime);
-        const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // in minutes
+        
+        // Use provided duration in seconds if available, otherwise calculate from time difference
+        let duration: number;
+        if (durationInSeconds !== undefined) {
+          duration = durationInSeconds; // Keep as seconds
+          console.log('Using provided duration:', durationInSeconds, 'seconds');
+        } else {
+          duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000); // in seconds
+          console.log('Calculated duration from time difference:', duration, 'seconds');
+        }
         
         sessions[sessionIndex] = {
           ...session,
@@ -74,6 +84,16 @@ class ReadingSessionManager {
           endPage,
           pagesRead: Math.max(0, endPage - session.startPage),
         };
+
+        console.log('Session updated:', {
+          id: sessionId,
+          startTime: session.startTime,
+          endTime: endTime.toISOString(),
+          duration,
+          startPage: session.startPage,
+          endPage,
+          pagesRead: Math.max(0, endPage - session.startPage)
+        });
 
         await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions));
       }
@@ -125,6 +145,7 @@ class ReadingSessionManager {
       if (completedSessions.length === 0) {
         return {
           totalMinutesRead: 0,
+          totalSecondsRead: 0,
           totalPagesRead: 0,
           totalSessions: 0,
           averageSessionDuration: 0,
@@ -136,9 +157,11 @@ class ReadingSessionManager {
         };
       }
 
-      const totalMinutesRead = completedSessions.reduce((sum, s) => sum + s.duration, 0);
+      // Duration is now in seconds, convert to minutes for stats
+      const totalSecondsRead = completedSessions.reduce((sum, s) => sum + s.duration, 0);
+      const totalMinutesRead = Math.round(totalSecondsRead / 60);
       const totalPagesRead = completedSessions.reduce((sum, s) => sum + s.pagesRead, 0);
-      const averageSessionDuration = Math.round(totalMinutesRead / completedSessions.length);
+      const averageSessionDuration = Math.round(totalSecondsRead / completedSessions.length); // average in seconds
 
       // Count unique books
       const uniqueBooks = new Set(sessions.map(s => s.bookId));
@@ -152,8 +175,17 @@ class ReadingSessionManager {
         .sort((a, b) => new Date(b.endTime || b.startTime).getTime() - new Date(a.endTime || a.startTime).getTime())[0];
       const lastReadDate = lastSession ? lastSession.date : '';
 
+      console.log('getUserStats result:', {
+        totalSecondsRead,
+        totalMinutesRead,
+        totalSessions: completedSessions.length,
+        averageSessionDuration,
+        sessions: completedSessions.map(s => ({ duration: s.duration, date: s.date }))
+      });
+
       return {
         totalMinutesRead,
+        totalSecondsRead,
         totalPagesRead,
         totalSessions: completedSessions.length,
         averageSessionDuration,
@@ -167,6 +199,7 @@ class ReadingSessionManager {
       console.error('Error calculating user stats:', error);
       return {
         totalMinutesRead: 0,
+        totalSecondsRead: 0,
         totalPagesRead: 0,
         totalSessions: 0,
         averageSessionDuration: 0,
