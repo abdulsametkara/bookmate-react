@@ -22,9 +22,10 @@ import { MOCK_BOOKS } from '../data/mockData';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import * as ReduxModels from '../store/slices/booksSlice';
-import { updateBook, deleteBook } from '../store/bookSlice';
+import { updateBook, deleteBook, saveBooks } from '../store/bookSlice';
 import CustomProgressBar from '../components/CustomProgressBar';
 import CustomButton from '../components/CustomButton';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -46,6 +47,7 @@ const BookDetailScreen = () => {
   
   // Get books from Redux store
   const libraryBooks = useSelector((state: RootState) => state.books.items);
+  const currentUserId = useSelector((state: RootState) => state.books.currentUserId);
   
   // Find book from Library or Mock Wishlist
   const MOCK_WISHLIST_BOOKS: Book[] = [
@@ -240,7 +242,7 @@ const BookDetailScreen = () => {
   };
 
   // İlerlemeyi kaydet
-  const saveProgress = () => {
+  const saveProgress = async () => {
     // Önceki değeri sakla
     const prevPage = book.currentPage;
     
@@ -257,8 +259,17 @@ const BookDetailScreen = () => {
             : currentPage > 0 
             ? 'READING' 
             : reduxBook.status,
+          lastReadingDate: new Date().toISOString(),
         };
         dispatch(updateBook(updatedBook));
+        
+        // AsyncStorage'a kaydet
+        if (currentUserId) {
+          const allBooks = libraryBooks.map(b => 
+            b.id === updatedBook.id ? updatedBook : b
+          );
+          await saveBooks(allBooks, currentUserId);
+        }
       } else if (mockBook) {
         // Mock kitabı güncelle
         mockBook.currentPage = currentPage;
@@ -309,6 +320,12 @@ const BookDetailScreen = () => {
               lastReadingDate: new Date().toISOString(),
             };
             dispatch(ReduxModels.addBook(newReduxBook));
+            
+            // AsyncStorage'a kaydet
+            if (currentUserId) {
+              const updatedBooks = [...libraryBooks, newReduxBook];
+              await saveBooks(updatedBooks, currentUserId);
+            }
           } catch (error) {
             console.error("Redux güncelleme hatası:", error);
           }
@@ -344,7 +361,7 @@ const BookDetailScreen = () => {
   };
 
   // Okuma durumunu güncelle
-  const updateReadingStatus = (status: BookStatus) => {
+  const updateReadingStatus = async (status: BookStatus) => {
     try {
       // Önceki durumu sakla
       const prevStatus = readingStatus;
@@ -361,8 +378,17 @@ const BookDetailScreen = () => {
                 status === BookStatus.COMPLETED ? 'COMPLETED' : 'TO_READ') as 'READING' | 'COMPLETED' | 'TO_READ',
           currentPage: status === BookStatus.COMPLETED ? book.pageCount : reduxBook.currentPage,
           progress: status === BookStatus.COMPLETED ? 100 : reduxBook.progress,
+          lastReadingDate: new Date().toISOString(),
         };
         dispatch(updateBook(updatedBook));
+        
+        // AsyncStorage'a kaydet
+        if (currentUserId) {
+          const allBooks = libraryBooks.map(b => 
+            b.id === updatedBook.id ? updatedBook : b
+          );
+          await saveBooks(allBooks, currentUserId);
+        }
       } else if (mockBook) {
         // Mock kitabı güncelle
         mockBook.status = status;
@@ -415,6 +441,12 @@ const BookDetailScreen = () => {
               lastReadingDate: new Date().toISOString(),
             };
             dispatch(ReduxModels.addBook(newReduxBook));
+            
+            // AsyncStorage'a kaydet
+            if (currentUserId) {
+              const updatedBooks = [...libraryBooks, newReduxBook];
+              await saveBooks(updatedBooks, currentUserId);
+            }
           } catch (error) {
             console.error("Redux güncelleme hatası:", error);
           }

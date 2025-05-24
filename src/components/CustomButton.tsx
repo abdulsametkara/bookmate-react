@@ -38,7 +38,7 @@ const CustomButton: React.FC<CustomButtonProps> = ({
   const textColor = mode === 'contained' ? '#FFFFFF' : primaryColor;
   
   // Button style based on mode
-  let buttonStyle = styles.button;
+  let buttonStyle: any = styles.button;
   if (mode === 'contained') {
     buttonStyle = {...styles.button, ...styles.containedButton, backgroundColor: primaryColor};
   } else if (mode === 'outlined') {

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
   TouchableOpacity, 
   Alert, 
-  StyleSheet 
+  StyleSheet, 
+  Dimensions 
 } from 'react-native';
 import { Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,8 +16,7 @@ import UserManager from '../utils/userManager';
 import type { User } from '../utils/userManager';
 import ReadingSessionManager from '../utils/readingSessionManager';
 import type { ReadingStats } from '../utils/readingSessionManager';
-import { DebugUtils } from '../utils/debugUtils';
-import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
+import { Colors, Spacing, BorderRadius, FontSizes } from '../theme/theme';
 
 interface UserProfileProps {
   onNavigateToSettings?: () => void;
@@ -197,18 +197,6 @@ const UserProfile: React.FC<UserProfileProps> = ({
               <TouchableOpacity style={styles.settingsButton} onPress={onNavigateToSettings}>
                 <MaterialCommunityIcons name="cog" size={20} color="#1f2d50" />
                 <Text style={styles.settingsButtonText}>Ayarlar</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.debugButton} 
-                onPress={async () => {
-                  if (currentUserId) {
-                    await DebugUtils.logUserData(currentUserId);
-                  }
-                }}
-              >
-                <MaterialCommunityIcons name="bug" size={20} color="#1f2d50" />
-                <Text style={styles.debugButtonText}>Debug Data</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -409,29 +397,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   settingsButtonText: {
-    color: '#1f2d50',
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    marginLeft: Spacing.sm,
-  },
-  debugButton: {
-    backgroundColor: '#e6ebff',
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  debugButtonText: {
     color: '#1f2d50',
     fontSize: FontSizes.md,
     fontWeight: '600',

@@ -3,6 +3,7 @@ export const LightTheme = {
   // Ana renkler
   primary: '#2D7DD2', // Mavi ana renk (zamanlayıcı, butonlar)
   primaryLight: '#E8F4FD', // Çok açık mavi arka plan
+  secondary: '#6366F1', // İkincil renk
   accent: '#34C759', // Yeşil vurgu rengi
   
   // Arka plan renkleri - Çok daha soft ve warm tonlar
@@ -53,12 +54,16 @@ export const LightTheme = {
   headerBackground: '#FAFBFC', // Header için
   warm: '#F9FAFB', // Warm ton
   coolGray: '#F1F5F9', // Cool gray ton
+  
+  // Türler için renkler
+  fiction: '#8B5CF6', // Kurgu türü için mor
 };
 
 export const DarkTheme = {
   // Ana renkler
   primary: '#60A5FA', // Açık mavi
   primaryLight: '#1E3A8A', // Koyu mavi arka plan
+  secondary: '#8B5CF6', // İkincil renk
   accent: '#34D399', // Açık yeşil
   
   // Arka plan renkleri
@@ -109,6 +114,9 @@ export const DarkTheme = {
   headerBackground: '#1F2937',
   warm: '#1F2937',
   coolGray: '#1A202C',
+  
+  // Türler için renkler
+  fiction: '#A78BFA', // Kurgu türü için açık mor
 };
 
 // Export current theme (will be replaced by context)

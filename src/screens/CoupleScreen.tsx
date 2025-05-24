@@ -126,21 +126,21 @@ const CoupleScreen = () => {
   };
   
   // Tarihi formatla
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    if (diffHours < 24) {
+    if (diffDays === 0) {
       // Bugün
       return `Bugün, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-    } else if (diffHours < 48) {
+    } else if (diffDays === 1) {
       // Dün
       return `Dün, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
     } else {
       // Diğer günler
-      const options = { day: 'numeric', month: 'long' };
+      const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' };
       return date.toLocaleDateString('tr-TR', options);
     }
   };

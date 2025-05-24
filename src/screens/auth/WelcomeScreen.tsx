@@ -2,11 +2,10 @@ import React from 'react';
 import { StyleSheet, View, Image, Text } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { AuthStackScreenProps } from '../../navigation/types';
 import { Colors } from '../../theme/theme';
 
 const WelcomeScreen = () => {
-  const navigation = useNavigation<AuthStackScreenProps<'Welcome'>['navigation']>();
+  const navigation = useNavigation();
 
   return (
     <View style={styles.container}>

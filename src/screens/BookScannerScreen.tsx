@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   foundText: {
     fontSize: 16,
-    color: Colors.fiction,
+    color: Colors.success,
     marginBottom: 8,
   },
   bookTitle: {
