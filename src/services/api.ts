@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// API URL'leri - Updated with actual IP address
+// API URL'leri - Gerçek IP adresi kullanılıyor
 const API_URL = 'http://192.168.1.5:5000/api';
 
 // Axios instance

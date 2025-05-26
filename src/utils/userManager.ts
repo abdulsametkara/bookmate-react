@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_CONFIG, getApiUrl, getAuthHeaders } from '../config/api';
 
 export interface User {
   id: string;
@@ -99,27 +100,56 @@ export class UserManager {
   // Authenticate user with email and password
   static async authenticateUser(email: string, password: string): Promise<User | null> {
     try {
-      const users = await this.getAllUsers();
-      const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      console.log('🔐 UserManager: Attempting authentication for:', email);
       
-      if (!user || !user.passwordHash) {
+      // API çağrısı yap
+      const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.AUTH.LOGIN), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password
+        })
+      });
+
+      console.log('📡 API Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('❌ API Error:', errorData);
         return null;
       }
 
-      const passwordHash = simpleHash(password);
-      if (user.passwordHash === passwordHash) {
-        // Update last login time
-        const updatedUser = {
-          ...user,
-          lastLoginAt: new Date().toISOString()
-        };
-        await this.saveUser(updatedUser);
-        return updatedUser;
-      }
+      const data = await response.json();
+      console.log('✅ API Success:', data);
+
+      // Backend'den gelen user data'sını local User formatına çevir
+      const user: User = {
+        id: data.user.id,
+        email: data.user.email,
+        displayName: data.user.displayName,
+        createdAt: data.user.createdAt,
+        lastLoginAt: new Date().toISOString(),
+        preferences: {
+          theme: 'system',
+          notifications: true,
+          readingGoal: 30,
+          preferredGenres: []
+        }
+      };
+
+      // JWT token'ı AsyncStorage'a kaydet
+      await AsyncStorage.setItem('bookmate_auth_token', data.token);
       
-      return null;
+      // User'ı local storage'a kaydet
+      await this.saveUser(user);
+      
+      console.log('💾 User saved to local storage');
+      
+      return user;
+      
     } catch (error) {
-      console.error('Error authenticating user:', error);
+      console.error('❌ Authentication error:', error);
       return null;
     }
   }
