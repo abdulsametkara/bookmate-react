@@ -9,7 +9,7 @@ export interface Book {
   pageCount: number;
   currentPage: number;
   progress: number;
-  status: 'TO_READ' | 'READING' | 'COMPLETED';
+  status: 'TO_READ' | 'READING' | 'COMPLETED' | 'PAUSED';
   genre?: string;
   publishYear?: number;
   publisher?: string;
@@ -176,7 +176,7 @@ const booksSlice = createSlice({
       state.items = state.items.filter(book => book.id !== action.payload);
       // Async operations should be handled outside of reducers
     },
-    updateBookStatus: (state, action: PayloadAction<{ id: string; status: 'TO_READ' | 'READING' | 'COMPLETED' }>) => {
+    updateBookStatus: (state, action: PayloadAction<{ id: string; status: 'TO_READ' | 'READING' | 'COMPLETED' | 'PAUSED' }>) => {
       const book = state.items.find(book => book.id === action.payload.id);
       if (book) {
         book.status = action.payload.status;

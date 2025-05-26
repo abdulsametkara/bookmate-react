@@ -309,10 +309,10 @@ const ReadingTimerScreen = () => {
         await ReadingSessionManager.endSession(currentSessionId, selectedBook.currentPage || startPage, sessionSeconds);
         
         // Timer state'ini sıfırla
-        setIsRunning(false);
-        setIsPaused(false);
-        setSessionSeconds(0);
-        setCurrentSessionId(null);
+      setIsRunning(false);
+      setIsPaused(false);
+      setSessionSeconds(0);
+      setCurrentSessionId(null);
         
         // AsyncStorage'dan timer state'ini temizle
         await clearTimerState();
@@ -328,7 +328,7 @@ const ReadingTimerScreen = () => {
           'Okuma Seansı Kaydedildi', 
           `${formatTime(sessionSeconds).formatted} okuma süresi bugünün toplamına eklendi.`,
           [{ text: 'Tamam' }]
-        );
+    );
       } catch (error) {
         console.error('Error ending reading session:', error);
         Alert.alert('Hata', 'Okuma seansı kaydedilemedi.');

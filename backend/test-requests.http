@@ -1,0 +1,29 @@
+### Test ana sayfa
+GET http://localhost:5000/
+
+### Kullanıcı kaydı
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "123456",
+  "displayName": "Test User"
+}
+
+### Giriş
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "123456"
+}
+
+### Profil (token ile)
+GET http://localhost:5000/api/auth/profile
+Authorization: Bearer test_token_12345
+
+### Kitaplar (token ile)
+GET http://localhost:5000/api/books
+Authorization: Bearer test_token_12345 

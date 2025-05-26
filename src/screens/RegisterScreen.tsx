@@ -14,19 +14,24 @@ import {
 import { Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useAppDispatch } from '../store';
-import { setCurrentUser } from '../store/bookSlice';
-import UserManager, { User } from '../utils/userManager';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
+import { register } from '../services/authService';
+
+type RootStackParamList = {
+  Login: { prefilledEmail?: string };
+  Register: undefined;
+};
+
+type RegisterScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Register'>;
 
 const RegisterScreen = () => {
   const navigation = useNavigation();
-  const dispatch = useAppDispatch();
   const [formData, setFormData] = useState({
     displayName: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -41,7 +46,7 @@ const RegisterScreen = () => {
 
   const validateForm = () => {
     if (!formData.displayName.trim()) {
-      Alert.alert('Hata', 'İsim alanı zorunludur.');
+      Alert.alert('Hata', 'İsim soyisim alanı zorunludur.');
       return false;
     }
 
@@ -76,21 +81,19 @@ const RegisterScreen = () => {
     setLoading(true);
 
     try {
-      // Email'in daha önce kullanılıp kullanılmadığını kontrol et
-      const isEmailExists = await UserManager.isEmailRegistered(formData.email);
-      if (isEmailExists) {
-        Alert.alert('Hata', 'Bu email adresi zaten kayıtlı.');
-        setLoading(false);
-        return;
-      }
+      console.log('🚀 Starting registration with API...', {
+        email: formData.email,
+        displayName: formData.displayName
+      });
 
-      // Yeni kullanıcı kaydet
-      const newUser = await UserManager.registerUser(
-        formData.email.trim(),
-        formData.password,
-        formData.displayName.trim()
-      );
+      const response = await register({
+        email: formData.email.trim(),
+        password: formData.password,
+        displayName: formData.displayName.trim()
+      });
 
+      console.log('✅ Registration successful:', response.user);
+      
       Alert.alert(
         'Başarılı', 
         'Hesabınız oluşturuldu! Şimdi giriş yapabilirsiniz.',
@@ -106,9 +109,9 @@ const RegisterScreen = () => {
         ]
       );
 
-    } catch (error) {
-      console.error('Registration error:', error);
-      Alert.alert('Hata', 'Hesap oluşturulurken bir hata oluştu.');
+    } catch (error: any) {
+      console.error('❌ Registration error:', error);
+      Alert.alert('Hata', error.message || 'Hesap oluşturulurken bir hata oluştu.');
     } finally {
       setLoading(false);
     }
