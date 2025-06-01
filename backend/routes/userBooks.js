@@ -39,7 +39,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const offset = (page - 1) * limit;
     
     let query = `
-      SELECT ub.*, b.title, b.author, b.cover_image_url, b.page_count, b.genre
+      SELECT ub.*, b.title, b.author, b.cover_image_url, b."pageCount" as page_count, b.genre
       FROM user_books ub
       JOIN books b ON ub.book_id = b.id
       WHERE ub.user_id = $1
@@ -139,16 +139,41 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Bu kitap zaten koleksiyonunuzda' });
     }
     
-    const result = await pool.query(`
-      INSERT INTO user_books (user_id, book_id, status, rating, notes, is_favorite)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-    `, [req.userId, book_id, status, rating, notes, is_favorite]);
+    // Transaction başlat - hem kütüphaneye ekle hem istek listesinden kaldır
+    await pool.query('BEGIN');
     
-    res.status(201).json({
-      message: 'Kitap koleksiyona eklendi',
-      userBook: result.rows[0]
-    });
+    try {
+      // 1. Kitabı kütüphaneye ekle
+      const result = await pool.query(`
+        INSERT INTO user_books (user_id, book_id, status, rating, notes, is_favorite)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `, [req.userId, book_id, status, rating, notes, is_favorite]);
+      
+      // 2. İstek listesinden kaldır (varsa)
+      const wishlistRemoved = await pool.query(`
+        DELETE FROM wishlists 
+        WHERE user_id = $1 AND book_id = $2 
+        RETURNING id
+      `, [req.userId, book_id]);
+      
+      await pool.query('COMMIT');
+      
+      const responseMessage = wishlistRemoved.rows.length > 0 
+        ? 'Kitap koleksiyona eklendi ve istek listesinden kaldırıldı'
+        : 'Kitap koleksiyona eklendi';
+      
+      res.status(201).json({
+        message: responseMessage,
+        userBook: result.rows[0],
+        removedFromWishlist: wishlistRemoved.rows.length > 0
+      });
+      
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+    
   } catch (error) {
     console.error('Add book to collection error:', error);
     res.status(500).json({ message: 'Kitap koleksiyona eklenemedi' });
@@ -159,7 +184,9 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, rating, notes, is_favorite, start_date, finish_date } = req.body;
+    const { status, rating, notes, is_favorite, start_date, finish_date, current_page } = req.body;
+    
+    console.log('📝 User book update request:', { id, status, current_page, user_id: req.userId });
     
     const result = await pool.query(`
       UPDATE user_books 
@@ -169,14 +196,17 @@ router.put('/:id', authenticateToken, async (req, res) => {
           is_favorite = COALESCE($5, is_favorite),
           start_date = COALESCE($6, start_date),
           finish_date = COALESCE($7, finish_date),
+          current_page = COALESCE($8, current_page),
           "updatedAt" = CURRENT_TIMESTAMP
-      WHERE id = $1 AND user_id = $8
+      WHERE id = $1 AND user_id = $9
       RETURNING *
-    `, [id, status, rating, notes, is_favorite, start_date, finish_date, req.userId]);
+    `, [id, status, rating, notes, is_favorite, start_date, finish_date, current_page, req.userId]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Kitap bulunamadı veya size ait değil' });
     }
+    
+    console.log('✅ User book updated successfully:', result.rows[0]);
     
     res.json({
       message: 'Kitap güncellendi',
@@ -223,14 +253,18 @@ router.get('/status/:status', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Geçersiz durum' });
     }
     
+    console.log('📖 Books by status query:', { userId: req.userId, status, limit, offset });
+    
     const result = await pool.query(`
-      SELECT ub.*, b.title, b.author, b.cover_image_url, b.page_count, b.genre
+      SELECT ub.*, b.title, b.author, b.cover_image_url, b."pageCount" as page_count, b.genre
       FROM user_books ub
       JOIN books b ON ub.book_id = b.id
       WHERE ub.user_id = $1 AND ub.status = $2
       ORDER BY ub."updatedAt" DESC
       LIMIT $3 OFFSET $4
     `, [req.userId, status, limit, offset]);
+    
+    console.log('📋 Query result:', result.rows.length, 'books found');
     
     const countResult = await pool.query(
       'SELECT COUNT(*) FROM user_books WHERE user_id = $1 AND status = $2',
@@ -271,3 +305,6 @@ router.get('/favorites', authenticateToken, async (req, res) => {
 });
 
 module.exports = router; 
+ 
+
+

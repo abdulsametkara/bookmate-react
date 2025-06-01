@@ -152,11 +152,12 @@ const booksSlice = createSlice({
       // saveBooks will be called from components when needed
     },
     addBook: (state, action: PayloadAction<Book>) => {
+      const now = new Date().toISOString();
       const bookWithUser = {
         ...action.payload,
         userId: state.currentUserId || undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: now,
+        updatedAt: now
       };
       state.items.push(bookWithUser);
       // Async operations should be handled outside of reducers
@@ -164,10 +165,11 @@ const booksSlice = createSlice({
     updateBook: (state, action: PayloadAction<Book>) => {
       const index = state.items.findIndex(book => book.id === action.payload.id);
       if (index !== -1) {
+        const now = new Date().toISOString();
         state.items[index] = {
           ...action.payload,
           userId: state.currentUserId || undefined,
-          updatedAt: new Date().toISOString()
+          updatedAt: now
         };
         // Async operations should be handled outside of reducers
       }

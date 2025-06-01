@@ -38,7 +38,7 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/auth/login', data);
     
     // Token ve kullanıcı bilgilerini kaydet
-    await AsyncStorage.setItem('token', response.data.token);
+    await AsyncStorage.setItem('bookmate_auth_token', response.data.token);
     await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
     
     return response.data;
@@ -57,7 +57,7 @@ export const register = async (data: RegisterData): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/auth/register', data);
     
     // Token ve kullanıcı bilgilerini kaydet
-    await AsyncStorage.setItem('token', response.data.token);
+    await AsyncStorage.setItem('bookmate_auth_token', response.data.token);
     await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
     
     return response.data;
@@ -72,7 +72,7 @@ export const register = async (data: RegisterData): Promise<AuthResponse> => {
 
 // Çıkış işlemi
 export const logout = async (): Promise<void> => {
-  await AsyncStorage.removeItem('token');
+  await AsyncStorage.removeItem('bookmate_auth_token');
   await AsyncStorage.removeItem('user');
 };
 
@@ -111,6 +111,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
 // Token kontrolü
 export const isAuthenticated = async (): Promise<boolean> => {
-  const token = await AsyncStorage.getItem('token');
+  const token = await AsyncStorage.getItem('bookmate_auth_token');
   return !!token;
 }; 
+ 

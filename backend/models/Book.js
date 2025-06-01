@@ -86,3 +86,4 @@ Book.prototype.getProgress = function() {
 };
 
 module.exports = Book; 
+ 

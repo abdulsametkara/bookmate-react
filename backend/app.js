@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const booksRouter = require('./routes/books');
 const userBooksRouter = require('./routes/userBooks');
 const readingSessionsRouter = require('./routes/readingSessions');
+const wishlistsRouter = require('./routes/wishlists');
 
 const app = express();
 const port = 5000;
@@ -73,12 +74,13 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'BookMate API is running!',
     version: '1.0.0',
-    endpoints: {
-      auth: '/api/auth/*',
-      books: '/api/books/*',
-      userBooks: '/api/user/books/*',
-      readingSessions: '/api/user/reading-sessions/*'
-    }
+          endpoints: {
+        auth: '/api/auth/*',
+        books: '/api/books/*',
+        userBooks: '/api/user/books/*',
+        readingSessions: '/api/user/reading-sessions/*',
+        wishlists: '/api/user/wishlists/*'
+      }
   });
 });
 
@@ -259,6 +261,7 @@ app.get('/api/categories', async (req, res) => {
 app.use('/api/books', booksRouter);
 app.use('/api/user/books', userBooksRouter);
 app.use('/api/user/reading-sessions', readingSessionsRouter);
+app.use('/api/user/wishlists', wishlistsRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -276,6 +279,7 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 BookMate Server running on port ${port}`);
   console.log(`📚 Local: http://localhost:${port}/`);
   console.log(`🌐 Network: http://192.168.1.5:${port}/`);
-  console.log(`📱 Mobile API: http://192.168.1.5:${port}/api/auth/login`);
+  console.log(`📱 Mobile API (Emulator): http://10.22.7.154:${port}/api/auth/login`);
   console.log(`🔍 Waiting for requests...`);
 }); 
+ 

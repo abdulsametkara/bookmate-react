@@ -10,8 +10,8 @@ export interface BookNote {
   id: string;
   content: string;
   page?: number;
-  createdAt: Date;
-  updatedAt?: Date;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Book {
@@ -22,7 +22,7 @@ export interface Book {
   isbn?: string;
   pageCount: number;
   currentPage: number;
-  createdAt: Date; // Was dateAdded
+  createdAt: string; // Was dateAdded
   status: BookStatus; // Was readingStatus, enum name also changed
   rating?: number; 
   genre?: string; // Was genreId
@@ -33,12 +33,12 @@ export interface Book {
   notes: BookNote[]; // Was string[], now uses BookNote interface
   isJointReading?: boolean; // Was isSharedWithPartner
   userId?: string; // Keep if useful, not in BookMateApp model. Make optional as it's not in BookMateApp model.
-  updatedAt?: Date; // Was lastUpdated
+  updatedAt?: string; // Was lastUpdated
 
   // Added from BookMateApp/src/models/Book.ts
   progress?: number; 
-  startDate?: Date;
-  finishDate?: Date;
+  startDate?: string;
+  finishDate?: string;
   partnerId?: string;
   partnerProgress?: number;
   isFavorite?: boolean;
@@ -50,7 +50,7 @@ export interface BookProgress {
   bookId: string;
   currentPage: number;
   totalPages: number;
-  lastReadingDate: Date;
+  lastReadingDate: string;
   readingStatus: BookStatus;
   notes?: string[];
 }
@@ -59,8 +59,8 @@ export interface ReadingSession {
   id: string;
   bookId: string;
   userId: string;
-  startTime: Date;
-  endTime: Date;
+  startTime: string;
+  endTime: string;
   duration: number; // dakika cinsinden
   pagesRead: number;
 } 

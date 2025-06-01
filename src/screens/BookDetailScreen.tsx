@@ -21,11 +21,12 @@ import { Book, BookStatus } from '../models';
 import { MOCK_BOOKS } from '../data/mockData';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import * as ReduxModels from '../store/slices/booksSlice';
-import { updateBook, deleteBook, saveBooks } from '../store/bookSlice';
+import { updateBook, deleteBook, saveBooks, addBook } from '../store/bookSlice';
+// import * as ReduxModels from '../store/slices/booksSlice'; // Temporary disable
 import CustomProgressBar from '../components/CustomProgressBar';
 import CustomButton from '../components/CustomButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import APIService from '../utils/apiService';
 
 const { width } = Dimensions.get('window');
 
@@ -38,8 +39,10 @@ const BookDetailScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   
-  // Get bookId from route params
-  const { bookId } = route.params as { bookId: string };
+  // Get bookId and bookData from route params
+  const { bookId, bookData } = route.params as { bookId: string; bookData?: Book };
+  
+  console.log('🔍 BookDetailScreen - Params:', { bookId, bookData: !!bookData });
   
   // State for image loading
   const [imageLoading, setImageLoading] = useState(true);
@@ -121,7 +124,22 @@ const BookDetailScreen = () => {
   // Create unified book data from available source
   let book: UnifiedBook | undefined;
   
-  if (reduxBook) {
+  // PRIORITY 1: Use bookData passed from LibraryScreen (backend data)
+  if (bookData) {
+    book = {
+      id: bookData.id,
+      title: bookData.title,
+      author: bookData.author,
+      coverURL: bookData.coverURL,
+      pageCount: bookData.pageCount || 0,
+      currentPage: bookData.currentPage || 0,
+      progress: bookData.progress || 0,
+      status: bookData.status,
+      publishYear: bookData.publishYear || undefined,
+      genre: bookData.genre || undefined,
+      description: bookData.description || undefined
+    };
+  } else if (reduxBook) {
     book = {
       id: reduxBook.id,
       title: reduxBook.title,
@@ -252,12 +270,43 @@ const BookDetailScreen = () => {
         currentPage,
         prevPage,
         currentUserId,
-        reduxBookExists: !!reduxBook
+        hasBookData: !!bookData
       });
       
-      // Kitabı bul ve güncelle
+      // Backend'e ilerleme güncellemesi gönder (öncelik)
+      if (bookData && bookData.id) {
+        console.log('🔄 Backend\'e ilerleme güncellemesi gönderiliyor:', { bookId: bookData.id, currentPage });
+        
+        // Status otomatik güncellemesi için
+        let statusUpdate = {};
+        if (currentPage >= book.pageCount && book.status !== BookStatus.COMPLETED) {
+          statusUpdate = { 
+            status: 'completed',
+            finish_date: new Date().toISOString()
+          };
+        } else if (currentPage > 0 && book.status === BookStatus.TO_READ) {
+          statusUpdate = { 
+            status: 'reading',
+            start_date: new Date().toISOString()
+          };
+        }
+        
+        const result = await APIService.updateUserBook(bookData.id, {
+          current_page: currentPage, // Sayfa ilerlemesini backend'e gönder
+          ...statusUpdate
+        });
+        
+        if (result.success) {
+          console.log('✅ Backend ilerleme güncellemesi başarılı');
+        } else {
+          console.error('❌ Backend ilerleme güncellemesi başarısız:', result.message);
+          Alert.alert("Hata", result.message || "İlerleme kaydedilirken bir hata oluştu.");
+          return;
+        }
+      }
+      
+      // Redis kitabını güncelle (varsa)
       if (reduxBook) {
-        // Redux kitabını güncelle
         const updatedBook = {
           ...reduxBook,
           currentPage,
@@ -285,81 +334,22 @@ const BookDetailScreen = () => {
           const allBooks = libraryBooks.map(b => 
             b.id === updatedBook.id ? updatedBook : b
           );
-          
-          console.log('Saving to AsyncStorage:', {
-            userId: currentUserId,
-            totalBooks: allBooks.length,
-            updatedBook: { id: updatedBook.id, currentPage: updatedBook.currentPage, progress: updatedBook.progress }
-          });
-          
           await saveBooks(allBooks, currentUserId);
-          console.log('Successfully saved to AsyncStorage');
-        }
-      } else if (mockBook) {
-        // Mock kitabı güncelle
-        mockBook.currentPage = currentPage;
-        mockBook.progress = Math.round((currentPage / mockBook.pageCount) * 100);
-        
-        // İlerlemeye göre kitap durumunu güncelle
-        if (currentPage >= book.pageCount) {
-          mockBook.status = BookStatus.COMPLETED;
-          setReadingStatus(BookStatus.COMPLETED);
-        } else if (currentPage > 0) {
-          mockBook.status = BookStatus.READING;
-          setReadingStatus(BookStatus.READING);
-        }
-      } else if (wishlistBook) {
-        // Wishlish kitabı güncelle 
-        wishlistBook.currentPage = currentPage;
-        wishlistBook.progress = Math.round((currentPage / wishlistBook.pageCount) * 100);
-        
-        // İlerlemeye göre kitap durumunu güncelle
-        if (currentPage >= book.pageCount) {
-          wishlistBook.status = BookStatus.COMPLETED;
-          setReadingStatus(BookStatus.COMPLETED);
-        } else if (currentPage > 0) {
-          wishlistBook.status = BookStatus.READING;
-          setReadingStatus(BookStatus.READING);
-        }
-        
-        // Wishlist kitabını Redux'a ekle
-        if (currentPage > 0 && !reduxBook) {
-          try {
-            // Wishlish'ten kütüphaneye ekle
-            const newReduxBook: ReduxModels.Book = {
-              id: wishlistBook.id,
-              title: wishlistBook.title,
-              author: wishlistBook.author,
-              coverURL: wishlistBook.coverURL || '',
-              genre: wishlistBook.genre || '',
-              publishYear: wishlistBook.publishYear || new Date().getFullYear(),
-              publisher: wishlistBook.publisher || '',
-              pageCount: wishlistBook.pageCount || 0,
-              currentPage: currentPage,
-              progress: Math.round((currentPage / wishlistBook.pageCount) * 100),
-              rating: wishlistBook.rating || 0,
-              status: currentPage >= wishlistBook.pageCount ? 'COMPLETED' : 'READING',
-              description: wishlistBook.description || '',
-              notes: [],
-              isSharedWithPartner: wishlistBook.isJointReading || false,
-              lastReadingDate: new Date().toISOString(),
-            };
-            dispatch(ReduxModels.addBook(newReduxBook));
-            
-            // AsyncStorage'a kaydet
-            if (currentUserId) {
-              const updatedBooks = [...libraryBooks, newReduxBook];
-              await saveBooks(updatedBooks, currentUserId);
-            }
-          } catch (error) {
-            console.error("Redux güncelleme hatası:", error);
-          }
         }
       }
       
-      // Kitap değeri güncelle
+      // Local book nesnesini güncelle
       book.currentPage = currentPage;
       book.progress = Math.round((currentPage / book.pageCount) * 100);
+      
+      // Status güncellemesi (local)
+      if (currentPage >= book.pageCount && book.status !== BookStatus.COMPLETED) {
+        book.status = BookStatus.COMPLETED;
+        setReadingStatus(BookStatus.COMPLETED);
+      } else if (currentPage > 0 && book.status === BookStatus.TO_READ) {
+        book.status = BookStatus.READING;
+        setReadingStatus(BookStatus.READING);
+      }
       
       // Kullanıcıya bilgi ver
       Alert.alert(
@@ -394,15 +384,55 @@ const BookDetailScreen = () => {
       // Durumu güncelle
       setReadingStatus(status);
       
-      // Kitabı bul ve güncelle
+      // Backend API status değerlerini map et
+      const apiStatus = status === BookStatus.READING ? 'reading' :
+                      status === BookStatus.COMPLETED ? 'completed' : 'to_read';
+      
+      // Backend'e durum değişikliğini gönder (öncelik)
+      if (bookData && bookData.id) {
+        console.log('🔄 Backend\'e durum güncellemesi gönderiliyor:', { bookId: bookData.id, status: apiStatus });
+        
+        const result = await APIService.updateUserBook(bookData.id, { 
+          status: apiStatus,
+          // Tamamlandıysa finish_date ekle
+          finish_date: status === BookStatus.COMPLETED ? new Date().toISOString() : undefined,
+          // Okumaya başlandıysa start_date ekle
+          start_date: status === BookStatus.READING && prevStatus === BookStatus.TO_READ ? new Date().toISOString() : undefined
+        });
+        
+        if (result.success) {
+          console.log('✅ Backend durum güncellemesi başarılı');
+          
+          // Local book nesnesini güncelle
+          book.status = status;
+          
+          // Tamamlandıysa progress ve currentPage'i güncelle
+          if (status === BookStatus.COMPLETED) {
+            book.currentPage = book.pageCount;
+            book.progress = 100;
+            setCurrentPage(book.pageCount);
+          } else if (status === BookStatus.READING && prevStatus === BookStatus.TO_READ) {
+            // Okumaya başlanırsa sayfa 1'e ayarla
+            book.currentPage = Math.max(book.currentPage, 1);
+            setCurrentPage(book.currentPage);
+          }
+        } else {
+          console.error('❌ Backend durum güncellemesi başarısız:', result.message);
+          // Hata durumunda eski duruma geri dön
+          setReadingStatus(prevStatus);
+          Alert.alert("Hata", result.message || "Kitap durumu güncellenirken bir hata oluştu.");
+          return;
+        }
+      }
+      
+      // Redux kitabını da güncelle (varsa)
       if (reduxBook) {
-        // Redux kitabını güncelle
         const updatedBook = {
           ...reduxBook,
           status: (status === BookStatus.READING ? 'READING' :
                 status === BookStatus.COMPLETED ? 'COMPLETED' : 'TO_READ') as 'READING' | 'COMPLETED' | 'TO_READ',
-          currentPage: status === BookStatus.COMPLETED ? book.pageCount : reduxBook.currentPage,
-          progress: status === BookStatus.COMPLETED ? 100 : reduxBook.progress,
+          currentPage: status === BookStatus.COMPLETED ? book.pageCount : book.currentPage,
+          progress: status === BookStatus.COMPLETED ? 100 : book.progress,
           lastReadingDate: new Date().toISOString(),
         };
         dispatch(updateBook(updatedBook));
@@ -414,72 +444,7 @@ const BookDetailScreen = () => {
           );
           await saveBooks(allBooks, currentUserId);
         }
-      } else if (mockBook) {
-        // Mock kitabı güncelle
-        mockBook.status = status;
-        
-        // Tamamlandıysa progress ve currentPage'i güncelle
-        if (status === BookStatus.COMPLETED) {
-          mockBook.currentPage = mockBook.pageCount;
-          mockBook.progress = 100;
-          setCurrentPage(mockBook.pageCount);
-        }
-      } else if (wishlistBook) {
-        // Wishlist kitabını güncelle
-        wishlistBook.status = status;
-        
-        // Tamamlandıysa progress ve currentPage'i güncelle
-        if (status === BookStatus.COMPLETED) {
-          wishlistBook.currentPage = wishlistBook.pageCount;
-          wishlistBook.progress = 100;
-          setCurrentPage(wishlistBook.pageCount);
-        } else if (status === BookStatus.READING) {
-          wishlistBook.currentPage = wishlistBook.currentPage > 0 ? wishlistBook.currentPage : 1;
-          wishlistBook.progress = Math.round((wishlistBook.currentPage / wishlistBook.pageCount) * 100);
-          setCurrentPage(wishlistBook.currentPage);
-        }
-        
-        // Wishlist kitabını Redux'a ekle
-        if ((status === BookStatus.READING || status === BookStatus.COMPLETED) && !reduxBook) {
-          try {
-            // Düzgün bir sayfa sayısı ayarla
-            const currentPg = status === BookStatus.COMPLETED ? wishlistBook.pageCount : 
-                            (wishlistBook.currentPage > 0 ? wishlistBook.currentPage : 1);
-            
-            // Wishlish'ten kütüphaneye ekle
-            const newReduxBook: ReduxModels.Book = {
-              id: wishlistBook.id,
-              title: wishlistBook.title,
-              author: wishlistBook.author,
-              coverURL: wishlistBook.coverURL || '',
-              genre: wishlistBook.genre || '',
-              publishYear: wishlistBook.publishYear || new Date().getFullYear(),
-              publisher: wishlistBook.publisher || '',
-              pageCount: wishlistBook.pageCount || 0,
-              currentPage: currentPg,
-              progress: Math.round((currentPg / wishlistBook.pageCount) * 100),
-              rating: wishlistBook.rating || 0,
-              status: status === BookStatus.COMPLETED ? 'COMPLETED' : 'READING',
-              description: wishlistBook.description || '',
-              notes: [],
-              isSharedWithPartner: wishlistBook.isJointReading || false,
-              lastReadingDate: new Date().toISOString(),
-            };
-            dispatch(ReduxModels.addBook(newReduxBook));
-            
-            // AsyncStorage'a kaydet
-            if (currentUserId) {
-              const updatedBooks = [...libraryBooks, newReduxBook];
-              await saveBooks(updatedBooks, currentUserId);
-            }
-          } catch (error) {
-            console.error("Redux güncelleme hatası:", error);
-          }
-        }
       }
-      
-      // Unified book nesnesini güncelle
-      book.status = status;
       
       // Kullanıcıya bilgi ver
       Alert.alert(
@@ -501,6 +466,8 @@ const BookDetailScreen = () => {
     } catch (error) {
       console.error("Durum güncelleme hatası:", error);
       Alert.alert("Hata", "Kitap durumu güncellenirken bir hata oluştu.");
+      // Hata durumunda eski duruma geri dön
+      setReadingStatus(prevStatus);
     }
   };
 

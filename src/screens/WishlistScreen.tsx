@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  FlatList, 
-  TouchableOpacity, 
+import {
+  StyleSheet,
+  View,
+  FlatList,
+  TouchableOpacity,
   SafeAreaView,
   Image,
   Text,
@@ -15,72 +15,114 @@ import { Surface } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
-import { useDispatch, useSelector } from 'react-redux';
-import { addBook, saveBooks } from '../store/bookSlice';
+import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_CONFIG, getApiUrl, getAuthHeaders } from '../config/api';
+
+interface GoogleBook {
+  id: string;
+  volumeInfo: {
+    title: string;
+    authors?: string[];
+    description?: string;
+    pageCount?: number;
+    publishedDate?: string;
+    imageLinks?: {
+      thumbnail?: string;
+      smallThumbnail?: string;
+    };
+    industryIdentifiers?: Array<{
+      type: string;
+      identifier: string;
+    }>;
+    publisher?: string;
+  };
+}
 
 interface WishlistItem {
   id: string;
+  user_id: string;
+  book_id: string;
+  priority: number;
+  notes?: string;
+  createdAt: string;
   title: string;
   author: string;
-  coverURL: string;
-  publishYear?: string;
-  pageCount?: number;
-  description?: string;
+  cover_image_url: string;
+  page_count: number;
+  publisher?: string;
+}
+
+interface BackendBook {
+  id: string;
+  title: string;
+  author: string;
   isbn?: string;
   publisher?: string;
+  published_year?: number;
+  page_count?: number;
+  genre?: string;
+  description?: string;
+  cover_image_url?: string;
+  language?: string;
 }
 
 const WishlistScreen = () => {
   const navigation = useNavigation();
-  const dispatch = useDispatch();
   const currentUserId = useSelector((state: RootState) => state.books.currentUserId);
-  const books = useSelector((state: RootState) => state.books.items);
+  
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<GoogleBook[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Wishlist storage key
-  const WISHLIST_KEY = `bookmate_wishlist_${currentUserId}`;
-
-  // Load wishlist from AsyncStorage on mount
+  // Sayfa yüklendiğinde kullanıcının istek listesini getir
   useEffect(() => {
-    loadWishlist();
+    if (currentUserId) {
+      loadWishlist();
+    }
   }, [currentUserId]);
 
+  // Backend API'den istek listesini yükle
   const loadWishlist = async () => {
-    if (!currentUserId) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const savedWishlist = await AsyncStorage.getItem(WISHLIST_KEY);
-      if (savedWishlist) {
-        setWishlist(JSON.parse(savedWishlist));
+      setIsLoading(true);
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      
+      if (!token) {
+        Alert.alert('Hata', 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        return;
+      }
+
+      const apiUrl = getApiUrl('/api/user/wishlists');
+      console.log('🎯 WishlistScreen - İstek URL:', apiUrl);
+      console.log('🔐 WishlistScreen - Token var:', !!token);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: getAuthHeaders(token),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWishlist(data);
+        console.log('✅ İstek listesi yüklendi:', data.length, 'kitap');
+      } else {
+        const errorData = await response.json();
+        console.error('❌ İstek listesi yükleme hatası:', errorData);
       }
     } catch (error) {
-      console.error('Error loading wishlist:', error);
+      console.error('❌ İstek listesi yükleme hatası:', error);
+      Alert.alert('Hata', 'İstek listesi yüklenirken bir hata oluştu.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveWishlist = async (newWishlist: WishlistItem[]) => {
-    if (!currentUserId) return;
-
-    try {
-      await AsyncStorage.setItem(WISHLIST_KEY, JSON.stringify(newWishlist));
-    } catch (error) {
-      console.error('Error saving wishlist:', error);
-    }
-  };
-
-  // Google Books API ile arama fonksiyonu
+  // Google Books API ile arama
   const searchBooks = async (query: string) => {
     if (!query.trim()) return;
     
@@ -92,137 +134,210 @@ const WishlistScreen = () => {
       const data = await response.json();
       
       if (data.items) {
-        const formattedBooks = data.items.map((item: any) => ({
-          id: item.id,
-          title: item.volumeInfo.title || 'Başlık Bilinmiyor',
-          author: item.volumeInfo.authors?.join(', ') || 'Yazar Bilinmiyor',
-          coverURL: item.volumeInfo.imageLinks?.thumbnail || item.volumeInfo.imageLinks?.smallThumbnail || 'https://via.placeholder.com/60x80?text=Kapak+Yok',
-          publishYear: item.volumeInfo.publishedDate?.substring(0, 4) || null,
-          pageCount: item.volumeInfo.pageCount || 0,
-          description: item.volumeInfo.description || '',
-          isbn: item.volumeInfo.industryIdentifiers?.[0]?.identifier || '',
-          publisher: item.volumeInfo.publisher || ''
-        }));
-        setSearchResults(formattedBooks);
+        setSearchResults(data.items);
         setShowResults(true);
+        console.log('📚 Arama sonuçları:', data.items.length, 'kitap bulundu');
       } else {
         setSearchResults([]);
         Alert.alert('Sonuç Bulunamadı', 'Aradığınız kitap bulunamadı.');
       }
     } catch (error) {
-      console.error('Arama hatası:', error);
+      console.error('❌ Arama hatası:', error);
       Alert.alert('Hata', 'Kitap arama sırasında bir hata oluştu.');
     } finally {
       setIsSearching(false);
     }
   };
 
-  const addToWishlist = async (book: any) => {
-    // Kitabın zaten listede olup olmadığını kontrol et
-    const alreadyExists = wishlist.some(item => item.id === book.id);
-    
-    if (alreadyExists) {
-      Alert.alert('Zaten Mevcut', 'Bu kitap zaten istek listenizde bulunuyor.');
-      return;
-    }
+  // Kitabı backend'e ekle ve sonra istek listesine ekle
+  const addToWishlist = async (googleBook: GoogleBook) => {
+    try {
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      
+      if (!token) {
+        Alert.alert('Hata', 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        return;
+      }
 
-    // Kitabı listeye ekle
-    const newWishlist = [...wishlist, book];
-    setWishlist(newWishlist);
-    await saveWishlist(newWishlist);
-    
-    Alert.alert(
-      'Kitap Eklendi',
-      `"${book.title}" istek listenize eklendi.`,
-      [{ text: 'Tamam' }]
-    );
-    setShowResults(false);
-    setSearchQuery('');
+      // 1. Önce kitabı backend books tablosuna ekle
+      const bookData: Partial<BackendBook> = {
+        title: googleBook.volumeInfo.title,
+        author: googleBook.volumeInfo.authors?.join(', ') || 'Bilinmeyen Yazar',
+        isbn: googleBook.volumeInfo.industryIdentifiers?.[0]?.identifier || '',
+        publisher: googleBook.volumeInfo.publisher || '',
+        published_year: googleBook.volumeInfo.publishedDate ? 
+          parseInt(googleBook.volumeInfo.publishedDate.substring(0, 4)) : undefined,
+        page_count: googleBook.volumeInfo.pageCount || 0,
+        genre: 'Genel',
+        description: googleBook.volumeInfo.description || '',
+        cover_image_url: googleBook.volumeInfo.imageLinks?.thumbnail || '',
+        language: 'tr'
+      };
+
+      console.log('📚 Backend\'e kitap ekleniyor:', bookData.title);
+
+      const bookResponse = await fetch(getApiUrl('/api/books'), {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(bookData),
+      });
+
+      let bookId: string;
+
+      if (bookResponse.ok) {
+        const bookResult = await bookResponse.json();
+        bookId = bookResult.book.id;
+        console.log('✅ Kitap backend\'e eklendi, ID:', bookId);
+      } else if (bookResponse.status === 409) {
+        // Kitap zaten varsa, ID'sini al (bu endpoint'i eklememiz gerekebilir)
+        Alert.alert('Uyarı', 'Bu kitap zaten sistemde mevcut.');
+        return;
+      } else {
+        const errorData = await bookResponse.json();
+        console.error('❌ Kitap ekleme hatası:', errorData);
+        Alert.alert('Hata', 'Kitap sisteme eklenirken bir hata oluştu.');
+        return;
+      }
+
+      // 2. Kitabı istek listesine ekle
+      const wishlistData = {
+        book_id: bookId,
+        priority: 3,
+        notes: ''
+      };
+
+      console.log('🎯 İstek listesine ekleniyor...');
+
+      const wishlistResponse = await fetch(getApiUrl('/api/user/wishlists'), {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(wishlistData),
+      });
+
+      if (wishlistResponse.ok) {
+        const wishlistResult = await wishlistResponse.json();
+        console.log('✅ İstek listesine eklendi:', wishlistResult);
+        
+        // Başarılı, listeyiç yeniden yükle
+        await loadWishlist();
+        
+        Alert.alert(
+          'Başarılı',
+          `"${bookData.title}" istek listenize eklendi.`,
+          [{ text: 'Tamam' }]
+        );
+        
+        setShowResults(false);
+        setSearchQuery('');
+      } else {
+        const errorData = await wishlistResponse.json();
+        console.error('❌ İstek listesi hatası:', errorData);
+        Alert.alert('Hata', errorData.message || 'İstek listesine eklenirken bir hata oluştu.');
+      }
+
+    } catch (error) {
+      console.error('❌ İstek listesine ekleme hatası:', error);
+      Alert.alert('Hata', 'İstek listesine eklerken bir hata oluştu.');
+    }
   };
 
-  const removeFromWishlist = async (bookId: string, bookTitle: string) => {
+  // İstek listesinden kaldır
+  const removeFromWishlist = async (wishlistId: string, bookTitle: string) => {
     Alert.alert(
       'Kitabı Kaldır',
       `"${bookTitle}" adlı kitabı istek listenizden kaldırmak istediğinizden emin misiniz?`,
       [
-        {
-          text: 'İptal',
-          style: 'cancel'
-        },
+        { text: 'İptal', style: 'cancel' },
         {
           text: 'Kaldır',
           style: 'destructive',
           onPress: async () => {
-            const newWishlist = wishlist.filter(item => item.id !== bookId);
-            setWishlist(newWishlist);
-            await saveWishlist(newWishlist);
-            Alert.alert('Başarılı', 'Kitap istek listenizden kaldırıldı.');
+            try {
+              const token = await AsyncStorage.getItem('bookmate_auth_token');
+              
+              const response = await fetch(getApiUrl(`/api/user/wishlists/${wishlistId}`), {
+                method: 'DELETE',
+                headers: getAuthHeaders(token || ''),
+              });
+
+              if (response.ok) {
+                await loadWishlist();
+                Alert.alert('Başarılı', 'Kitap istek listenizden kaldırıldı.');
+              } else {
+                Alert.alert('Hata', 'Kitap kaldırılırken bir hata oluştu.');
+              }
+            } catch (error) {
+              console.error('❌ Kaldırma hatası:', error);
+              Alert.alert('Hata', 'Kitap kaldırılırken bir hata oluştu.');
+            }
           }
         }
       ]
     );
   };
 
-  const addToLibrary = async (book: any) => {
-    if (!currentUserId) {
-      Alert.alert('Hata', 'Kullanıcı bilgisi bulunamadı.');
-      return;
-    }
-
+  // Kitabı kütüphaneye ekle ve istek listesinden kaldır
+  const addToLibrary = async (wishlistItem: WishlistItem) => {
     try {
-      // Kitabı Redux formatına çevir
-      const libraryBook = {
-        id: book.id || `wishlist_${Date.now()}`,
-        title: book.title,
-        author: book.author,
-        coverURL: book.coverURL || '',
-        genre: book.genre || 'Genel',
-        publishYear: book.publishYear ? parseInt(book.publishYear) : new Date().getFullYear(),
-        publisher: book.publisher || 'Bilinmiyor',
-        pageCount: book.pageCount || 0,
-        currentPage: 0,
-        progress: 0,
-        status: 'TO_READ' as const,
-        description: book.description || '',
-        notes: [],
-        isSharedWithPartner: false,
-        lastReadingDate: new Date().toISOString(),
-        userId: currentUserId,
-      };
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      
+      const response = await fetch(getApiUrl('/api/user/books'), {
+        method: 'POST',
+        headers: getAuthHeaders(token || ''),
+        body: JSON.stringify({
+          book_id: wishlistItem.book_id,
+          status: 'to_read',
+          is_favorite: false
+        }),
+      });
 
-      // Redux store'a ekle
-      dispatch(addBook(libraryBook));
-
-      // AsyncStorage'a kaydet
-      const currentBooks = books.filter(book => book.userId === currentUserId);
-      const updatedBooks = [...currentBooks, libraryBook];
-      await saveBooks(updatedBooks, currentUserId);
-
-      // İstek listesinden kaldır
-      const newWishlist = wishlist.filter(item => item.id !== book.id);
-      setWishlist(newWishlist);
-      await saveWishlist(newWishlist);
-
-      Alert.alert(
-        'Başarılı', 
-        `"${book.title}" kütüphanenize eklendi ve istek listenizden kaldırıldı.`,
-        [{ text: 'Tamam' }]
-      );
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Kütüphaneye eklendi:', result);
+        
+        // İstek listesini yeniden yükle (otomatik kaldırılmış olacak)
+        await loadWishlist();
+        
+        Alert.alert(
+          'Başarılı',
+          result.message || 'Kitap kütüphanenize eklendi.',
+          [{ text: 'Tamam' }]
+        );
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Hata', errorData.message || 'Kütüphaneye eklenirken bir hata oluştu.');
+      }
     } catch (error) {
-      console.error('Kütüphaneye ekleme hatası:', error);
-      Alert.alert('Hata', 'Kitap kütüphaneye eklenirken bir hata oluştu.');
+      console.error('❌ Kütüphaneye ekleme hatası:', error);
+      Alert.alert('Hata', 'Kütüphaneye eklerken bir hata oluştu.');
     }
   };
 
-  const showBookOptions = (book: any) => {
+  const showWishlistBookOptions = (item: WishlistItem) => {
     Alert.alert(
-      book.title,
+      item.title,
       'Bu kitap için ne yapmak istiyorsunuz?',
       [
+        { text: 'İptal', style: 'cancel' },
         {
-          text: 'İptal',
-          style: 'cancel'
+          text: 'Kütüphaneye Ekle',
+          onPress: () => addToLibrary(item)
         },
+        {
+          text: 'Listeden Kaldır',
+          style: 'destructive',
+          onPress: () => removeFromWishlist(item.id, item.title)
+        }
+      ]
+    );
+  };
+
+  const showBookOptions = (book: GoogleBook) => {
+    Alert.alert(
+      book.volumeInfo.title,
+      'Bu kitabı istek listenize eklemek istediğinizden emin misiniz?',
+      [
+        { text: 'İptal', style: 'cancel' },
         {
           text: 'İstek Listesine Ekle',
           onPress: () => addToWishlist(book)
@@ -231,81 +346,51 @@ const WishlistScreen = () => {
     );
   };
 
-  const showWishlistBookOptions = (book: any) => {
-    Alert.alert(
-      book.title,
-      'Bu kitap için ne yapmak istiyorsunuz?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Kütüphaneye Ekle',
-          onPress: () => {
-            addToLibrary(book);
-          }
-        },
-        {
-          text: 'Detayları Görüntüle',
-          onPress: () => {
-            navigation.navigate('BookDetail', { bookId: book.id });
-          }
-        },
-        {
-          text: 'Silmek İstiyorum',
-          style: 'destructive',
-          onPress: () => {
-            removeFromWishlist(book.id, book.title);
-          }
-        }
-      ]
-    );
-  };
-
-  const renderWishlistItem = ({ item }: { item: any }) => (
+  const renderWishlistItem = ({ item }: { item: WishlistItem }) => (
     <TouchableOpacity onPress={() => showWishlistBookOptions(item)}>
-      <Surface style={styles.bookItem}>
+      <Surface style={styles.wishlistItem}>
         <View style={styles.bookCover}>
           <Image 
-            source={{ uri: item.coverURL }}
+            source={{ uri: item.cover_image_url || 'https://via.placeholder.com/60x80?text=Kapak+Yok' }}
             style={styles.bookImage}
           />
         </View>
         <View style={styles.bookInfo}>
           <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
           <Text style={styles.bookAuthor}>{item.author}</Text>
-          {item.publishYear && (
-            <Text style={styles.publishYear}>{item.publishYear}</Text>
-          )}
+          <Text style={styles.priority}>Öncelik: {item.priority}</Text>
         </View>
         <TouchableOpacity 
-          style={styles.removeButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            removeFromWishlist(item.id, item.title);
-          }}
+          style={styles.menuButton}
+          onPress={() => showWishlistBookOptions(item)}
         >
-          <MaterialCommunityIcons name="close" size={20} color={Colors.textSecondary} />
+          <MaterialCommunityIcons name="dots-vertical" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       </Surface>
     </TouchableOpacity>
   );
 
-  const renderSearchResult = ({ item }: { item: any }) => (
+  const renderSearchResult = ({ item }: { item: GoogleBook }) => (
     <TouchableOpacity onPress={() => showBookOptions(item)}>
       <Surface style={styles.searchResultItem}>
         <View style={styles.bookCover}>
           <Image 
-            source={{ uri: item.coverURL }}
+            source={{ 
+              uri: item.volumeInfo.imageLinks?.thumbnail || 
+                   'https://via.placeholder.com/60x80?text=Kapak+Yok' 
+            }}
             style={styles.bookImage}
           />
         </View>
         <View style={styles.bookInfo}>
-          <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.bookAuthor}>{item.author}</Text>
-          {item.publishYear && (
-            <Text style={styles.publishYear}>{item.publishYear}</Text>
+          <Text style={styles.bookTitle} numberOfLines={2}>{item.volumeInfo.title}</Text>
+          <Text style={styles.bookAuthor}>
+            {item.volumeInfo.authors?.join(', ') || 'Bilinmeyen Yazar'}
+          </Text>
+          {item.volumeInfo.publishedDate && (
+            <Text style={styles.publishYear}>
+              {item.volumeInfo.publishedDate.substring(0, 4)}
+            </Text>
           )}
         </View>
         <TouchableOpacity 
@@ -381,6 +466,8 @@ const WishlistScreen = () => {
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.booksList}
+              onRefresh={loadWishlist}
+              refreshing={isLoading}
             />
           ) : (
             <View style={styles.emptyState}>
@@ -406,66 +493,103 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    backgroundColor: Colors.surface,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   title: {
-    fontSize: 22,
+    fontSize: FontSizes.xl,
     fontWeight: 'bold',
     color: Colors.text,
   },
   searchContainer: {
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5E5E5',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: '#D0D0D0',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   searchInput: {
     flex: 1,
+    marginLeft: Spacing.sm,
     fontSize: FontSizes.md,
     color: Colors.text,
   },
-  booksList: {
-    paddingHorizontal: Spacing.lg,
-  },
-  bookItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  searchResultsContainer: {
+    flex: 1,
     backgroundColor: Colors.surface,
-    padding: Spacing.md,
+    margin: Spacing.lg,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  searchResultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  searchResultsTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  searchResultsList: {
+    padding: Spacing.sm,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    marginVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+  },
+  booksList: {
+    padding: Spacing.md,
+  },
+  wishlistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    marginVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   bookCover: {
-    width: 50,
-    height: 70,
-    backgroundColor: Colors.bookCover,
+    width: 60,
+    height: 80,
     borderRadius: BorderRadius.sm,
-    marginRight: Spacing.md,
     overflow: 'hidden',
+    marginRight: Spacing.md,
   },
   bookImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   bookInfo: {
     flex: 1,
@@ -479,89 +603,59 @@ const styles = StyleSheet.create({
   bookAuthor: {
     fontSize: FontSizes.sm,
     color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
   },
   publishYear: {
-    fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
-    marginTop: Spacing.xs,
+    fontSize: FontSizes.sm,
+    color: Colors.textSecondary,
   },
-  removeButton: {
+  priority: {
+    fontSize: FontSizes.sm,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  addButton: {
+    backgroundColor: Colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuButton: {
     padding: Spacing.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSizes.md,
+    color: Colors.textSecondary,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xxl,
   },
   emptyIconContainer: {
     marginBottom: Spacing.lg,
-    opacity: 0.6,
   },
   emptyStateTitle: {
-    fontSize: 18,
+    fontSize: FontSizes.lg,
     fontWeight: '600',
     color: Colors.text,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   emptyStateSubtitle: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: FontSizes.md,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
-    paddingHorizontal: Spacing.lg,
-  },
-  searchResultsContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  searchResultsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-  },
-  searchResultsTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  searchResultsList: {
-    padding: Spacing.md,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  addButton: {
-    padding: Spacing.sm,
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.full,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  loadingText: {
-    fontSize: FontSizes.md,
-    color: Colors.text,
-    marginTop: Spacing.sm,
   },
 });
 

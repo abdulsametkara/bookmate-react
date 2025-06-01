@@ -39,3 +39,4 @@ async function clearTables() {
 }
 
 clearTables(); 
+ 

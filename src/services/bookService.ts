@@ -106,3 +106,4 @@ export const updateProgress = async (id: string, currentPage: number): Promise<B
     return updateReadingProgress(id, currentPage);
   }
 }; 
+ 

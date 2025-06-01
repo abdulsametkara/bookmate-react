@@ -178,7 +178,7 @@ router.post('/', authenticateToken, async (req, res) => {
     
     // Kitabı ekle
     const result = await pool.query(`
-      INSERT INTO books (title, author, isbn, publisher, published_year, page_count, genre, description, cover_image_url, language)
+      INSERT INTO books (title, author, isbn, publisher, "publishedYear", "pageCount", genre, description, cover_image_url, language)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `, [title, author, isbn, publisher, published_year, page_count, genre, description, cover_image_url, language]);
@@ -201,12 +201,20 @@ router.post('/', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Book create error:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error detail:', error.detail);
+    
     if (error.code === '23505') { // Unique constraint violation
       res.status(400).json({ message: 'Bu ISBN numarası zaten kullanılıyor' });
+    } else if (error.code === '42703') { // Column does not exist
+      res.status(500).json({ message: 'Veritabanı sütun hatası: ' + error.message });
     } else {
-      res.status(500).json({ message: 'Kitap eklenemedi' });
+      res.status(500).json({ message: 'Kitap eklenemedi: ' + error.message });
     }
   }
 });
 
 module.exports = router; 
+ 
+

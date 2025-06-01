@@ -3,33 +3,20 @@ import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 
 // Reducer'ları import etme
 import booksReducer from './bookSlice';
+import authReducer from './slices/authSlice';
 
 export const store = configureStore({
   reducer: {
     books: booksReducer,
+    auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Date objelerini string'e çevireceğiz, bu kontrolü esnek hale getirelim
-        ignoredActions: [
-          'books/setBooks',
-          'books/addBook',
-          'books/updateBook',
-          'books/setCurrentUser'
-        ],
-        ignoredActionPaths: [
-          'payload.createdAt',
-          'payload.updatedAt', 
-          'payload.startDate',
-          'meta.arg',
-          'meta.baseQueryMeta'
-        ],
-        ignoredPaths: [
-          'books.items.createdAt',
-          'books.items.updatedAt',
-          'books.items.startDate'
-        ],
+        // Artık tüm Date'ler string olduğu için bu kontrolleri kaldırıyoruz
+        ignoredActions: [],
+        ignoredActionPaths: [],
+        ignoredPaths: [],
       },
     }),
 });

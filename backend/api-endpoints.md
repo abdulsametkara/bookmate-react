@@ -70,3 +70,4 @@
 - `GET /api/dashboard` - Ana sayfa verileri
 - `GET /api/user/recent-activity` - Son aktiviteler
 - `POST /api/user/sync` - Veri senkronizasyonu 
+ 

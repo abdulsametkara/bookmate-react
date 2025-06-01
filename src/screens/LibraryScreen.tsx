@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, FlatList, TouchableOpacity, SafeAreaView, ScrollView, Image, Platform } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, SafeAreaView, ScrollView, Image, Platform, Alert } from 'react-native';
 import { 
   Text, 
   Card, 
@@ -19,8 +19,9 @@ import { Book, BookStatus } from '../models';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
-import { loadBooks, setBooks } from '../store/bookSlice';
+// import { loadBooks, setBooks } from '../store/bookSlice'; // Geçici olarak devre dışı
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import APIService, { UserBook } from '../utils/apiService';
 
 const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void; viewMode: string }) => {
   const [imageLoading, setImageLoading] = useState(true);
@@ -173,59 +174,100 @@ const LibraryScreen = () => {
   const [viewMode, setViewMode] = useState('grid'); // grid or list
   const [refreshKey, setRefreshKey] = useState(0); // Add this to force refresh
   const [isLoading, setIsLoading] = useState(false);
+  const [books, setBooks] = useState<Book[]>([]);
 
-  // Redux ile kitapları al
-  const reduxBooks = useSelector((state: RootState) => state.books.items);
   const currentUserId = useSelector((state: RootState) => state.books.currentUserId);
-  const loading = useSelector((state: RootState) => state.books.loading);
-  
-  // Kullanıcıya ait kitapları filtrele ve Redux modelini uygulama modeline çevir
-  const books = reduxBooks
-    .filter(book => book.userId === currentUserId)
-    .map(convertReduxBook);
 
-  // Redux kitap modelini uygulama kitap modeline çevir
-  function convertReduxBook(reduxBook: any): Book {
-    return {
-      id: reduxBook.id,
-      title: reduxBook.title,
-      author: reduxBook.author,
-      coverURL: reduxBook.coverURL,
-      pageCount: reduxBook.pageCount,
-      currentPage: reduxBook.currentPage,
-      progress: reduxBook.progress,
-      status: reduxBook.status === 'TO_READ' ? BookStatus.TO_READ :
-              reduxBook.status === 'READING' ? BookStatus.READING :
-              reduxBook.status === 'COMPLETED' ? BookStatus.COMPLETED : 
-              BookStatus.TO_READ,
-      notes: [],
-      createdAt: new Date(),
-      genre: reduxBook.genre,
-      publishYear: reduxBook.publishYear,
-      publisher: reduxBook.publisher,
-      description: reduxBook.description,
-    };
-  }
-
-  // AsyncStorage'dan kitapları yükle
-  const loadBooksFromStorage = async () => {
+  // Backend API'den kullanıcının kitaplarını yükle
+  const loadBooksFromAPI = async () => {
     if (!currentUserId) return;
     
     setIsLoading(true);
     try {
-      const storedBooks = await loadBooks(currentUserId);
-      console.log('LibraryScreen loading books:', {
-        userId: currentUserId,
-        bookCount: storedBooks.length,
-        books: storedBooks.map(b => ({ id: b.id, title: b.title, currentPage: b.currentPage, progress: b.progress }))
-      });
-      dispatch(setBooks(storedBooks));
+      console.log('📚 Backend API\'den kitaplar yükleniyor...');
+      const result = await APIService.getUserBooks();
+      
+      if (result.success && result.books) {
+        // Backend UserBook formatını uygulama Book formatına çevir
+        const convertedBooks = result.books.map(convertUserBookToBook);
+        setBooks(convertedBooks);
+        console.log('✅ Kitaplar yüklendi:', convertedBooks.length, 'kitap');
+        
+        // Redux store'a da kaydet (uyumluluk için) - Geçici olarak devre dışı
+        // const reduxBooks = convertedBooks.map(convertBookToRedux);
+        // dispatch(setBooks(reduxBooks));
+      } else {
+        console.error('❌ Kitap yükleme hatası:', result.message);
+        // Boş liste göster
+        setBooks([]);
+      }
     } catch (error) {
-      console.error('Error loading books in LibraryScreen:', error);
+      console.error('❌ API Hatası:', error);
+      Alert.alert('Hata', 'Kitaplar yüklenirken bir hata oluştu.');
+      setBooks([]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Backend UserBook'u uygulama Book modeline çevir
+  function convertUserBookToBook(userBook: UserBook): Book {
+    // Backend'den gelen status değerlerini app status'lara çevir
+    let status: BookStatus;
+    switch (userBook.status) {
+      case 'reading': status = BookStatus.READING; break;
+      case 'completed': status = BookStatus.COMPLETED; break;
+      case 'to_read': 
+      case 'paused':
+      case 'dropped':
+      default: status = BookStatus.TO_READ; break;
+    }
+
+    // Progress hesaplama (current_page kullan)
+    const currentPage = userBook.current_page || 0;
+    const progress = userBook.page_count > 0 ? 
+      Math.round((currentPage / userBook.page_count) * 100) : 0;
+
+    return {
+      id: userBook.id,
+      title: userBook.title,
+      author: userBook.author,
+      coverURL: userBook.cover_image_url || 'https://via.placeholder.com/200x300?text=Kapak+Yok',
+      pageCount: userBook.page_count || 0,
+      currentPage: currentPage,
+      progress: progress,
+      status: status,
+      createdAt: new Date(userBook.createdAt),
+      notes: [],
+      genre: userBook.genre || 'Genel',
+      publishYear: new Date().getFullYear(),
+      publisher: 'Bilinmiyor',
+      description: '',
+    };
+  }
+
+  // Uygulama Book'unu Redux formatına çevir (uyumluluk için)
+  function convertBookToRedux(book: Book): any {
+    return {
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      coverURL: book.coverURL,
+      genre: book.genre,
+      publishYear: book.publishYear,
+      publisher: book.publisher,
+      pageCount: book.pageCount,
+      currentPage: book.currentPage,
+      progress: book.progress,
+      status: book.status === BookStatus.READING ? 'READING' :
+              book.status === BookStatus.COMPLETED ? 'COMPLETED' : 'TO_READ',
+      description: book.description,
+      notes: book.notes,
+      isSharedWithPartner: false,
+      lastReadingDate: new Date().toISOString(),
+      userId: currentUserId,
+    };
+  }
 
   // Arama fonksiyonu
   const onChangeSearch = (query) => setSearchQuery(query);
@@ -252,8 +294,11 @@ const LibraryScreen = () => {
 
   // Kitap detayına git
   const goToBookDetail = (bookId) => {
+    // Backend'den yüklenen kitabı bul
+    const book = books.find(b => b.id === bookId);
     navigation.navigate('BookDetail', { 
       bookId,
+      bookData: book, // Kitap verisini direkt geçir
       onStatusChangeKey: refreshKey // fonksiyon yerine bir key gönder
     });
   };
@@ -261,9 +306,9 @@ const LibraryScreen = () => {
   // Status değişikliğini dinle ve veri yükle
   useFocusEffect(
     useCallback(() => {
-      // Ekran odaklandığında kitap listesini güncelle ve AsyncStorage'dan yükle
+      // Ekran odaklandığında kitap listesini güncelle ve API'den yükle
       setRefreshKey(prev => prev + 1);
-      loadBooksFromStorage();
+      loadBooksFromAPI();
     }, [currentUserId])
   );
 
@@ -320,7 +365,13 @@ const LibraryScreen = () => {
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <MaterialCommunityIcons name="magnify" size={20} color={Colors.textSecondary} />
-            <Text style={styles.searchPlaceholder}>Kitap veya yazar ara</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Kitap veya yazar ara"
+              placeholderTextColor={Colors.textSecondary}
+              value={searchQuery}
+              onChangeText={onChangeSearch}
+            />
           </View>
         </View>
       </View>
@@ -413,34 +464,48 @@ const LibraryScreen = () => {
         </View>
       </View>
 
-      {/* Book List */}
-      {filteredBooks.length > 0 ? (
+      {/* Books List/Grid */}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Kütüphaneniz yükleniyor...</Text>
+        </View>
+      ) : filteredBooks.length > 0 ? (
         <FlatList
           data={filteredBooks}
           renderItem={({ item }) => (
             <BookItem 
               book={item} 
               onPress={() => goToBookDetail(item.id)} 
-              viewMode={viewMode} 
+              viewMode={viewMode}
             />
           )}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           numColumns={viewMode === 'grid' ? 2 : 1}
-          key={`${viewMode}-${refreshKey}`}
-          contentContainerStyle={styles.bookListContent}
+          key={viewMode} // Force re-render on layout change
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.booksList}
+          onRefresh={loadBooksFromAPI}
+          refreshing={isLoading}
         />
       ) : (
         <View style={styles.emptyState}>
-          <MaterialCommunityIcons 
-            name="book-open-variant" 
-            size={70} 
-            color={Colors.textTertiary}
-          />
-          <Text style={styles.emptyStateText}>Henüz kitap eklenmemiş</Text>
+          <View style={styles.emptyIconContainer}>
+            <MaterialCommunityIcons name="book-outline" size={48} color="#BBBBBB" />
+          </View>
+          <Text style={styles.emptyStateTitle}>Kütüphaneniz boş</Text>
           <Text style={styles.emptyStateSubtitle}>
-            İstek listesinden kitap ekleyebilir veya manuel olarak kitap ekleyebilirsiniz
+            {searchQuery ? 'Arama kriterlerinize uygun kitap bulunamadı' : 'Henüz kütüphanenize kitap eklenmemiş'}
           </Text>
+          {!searchQuery && (
+            <TouchableOpacity 
+              style={styles.addFirstBookButton}
+              onPress={() => navigation.navigate('WishlistScreen')}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+              <Text style={styles.addFirstBookText}>İlk Kitabını Ekle</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </SafeAreaView>
@@ -548,9 +613,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  searchPlaceholder: {
+  searchInput: {
+    flex: 1,
     fontSize: FontSizes.md,
-    color: Colors.textSecondary,
+    color: Colors.text,
   },
   filtersSection: {
     backgroundColor: Colors.surface,
@@ -616,7 +682,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text,
   },
-  bookListContent: {
+  booksList: {
     padding: Spacing.md,
     paddingBottom: 100,
   },
@@ -783,7 +849,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  emptyStateText: {
+  emptyIconContainer: {
+    marginBottom: Spacing.md,
+  },
+  emptyStateTitle: {
     fontSize: FontSizes.xl,
     color: Colors.textSecondary,
     marginTop: Spacing.md,
@@ -794,6 +863,20 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  addFirstBookButton: {
+    backgroundColor: Colors.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  addFirstBookText: {
+    color: Colors.surface,
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
   },
   imageLoadingContainer: {
     position: 'absolute',
@@ -818,6 +901,16 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  loadingText: {
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
   },
 });
 

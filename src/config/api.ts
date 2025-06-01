@@ -1,6 +1,11 @@
 // API Configuration
+import { Platform } from 'react-native';
+
 export const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.5:5000',
+  BASE_URL: Platform.select({
+    android: 'http://10.0.2.2:5000', // Android emülatör için localhost
+    default: 'http://10.22.7.154:5000', // Diğer platformlar için
+  }),
   ENDPOINTS: {
     AUTH: {
       LOGIN: '/api/auth/login',
@@ -12,6 +17,12 @@ export const API_CONFIG = {
       SEARCH: '/api/books/search',
       DETAIL: '/api/books',
       USER_BOOKS: '/api/user/books'
+    },
+    WISHLISTS: {
+      LIST: '/api/user/wishlists',
+      ADD: '/api/user/wishlists',
+      DELETE: '/api/user/wishlists',
+      UPDATE: '/api/user/wishlists'
     },
     DASHBOARD: '/api/dashboard'
   }

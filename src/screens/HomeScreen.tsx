@@ -19,22 +19,68 @@ const HomeScreen = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
 
-  // AsyncStorage'dan kitapları yükle
-  const loadBooksFromStorage = async () => {
+  // Backend API'den reading kitapları yükle
+  const loadReadingBooksFromAPI = async () => {
     if (!currentUserId) return;
     
     try {
-      const storedBooks = await loadBooks(currentUserId);
-      console.log('HomeScreen loading books:', {
-        userId: currentUserId,
-        bookCount: storedBooks.length,
-        books: storedBooks.map(b => ({ id: b.id, title: b.title, currentPage: b.currentPage, progress: b.progress }))
-      });
-      dispatch(setBooks(storedBooks));
+      // Backend'den 'reading' statusündeki kitapları getir
+      const APIService = (await import('../utils/apiService')).default;
+      const result = await APIService.getBooksByStatus('reading');
+      
+      if (result.success && result.books) {
+        console.log('HomeScreen loading reading books:', {
+          userId: currentUserId,
+          readingBooksCount: result.books.length,
+          books: result.books.map(b => ({ 
+            id: b.id, 
+            title: b.title, 
+            current_page: b.current_page,
+            page_count: b.page_count,
+            status: b.status 
+          }))
+        });
+        
+        // Backend UserBook'ları uygulama Book formatına çevir (sadece reading olanlar)
+        const convertedBooks = result.books.map(convertUserBookToBook);
+        
+        // Mevcut Redux kitaplarını al ve reading olanları güncelle
+        const allBooks = books.filter(b => b.userId !== currentUserId || b.status !== 'READING');
+        const updatedBooks = [...allBooks, ...convertedBooks];
+        
+        dispatch(setBooks(updatedBooks));
+      } else {
+        console.error('❌ Reading books loading failed:', result.message);
+      }
     } catch (error) {
-      console.error('Error loading books in HomeScreen:', error);
+      console.error('Error loading reading books in HomeScreen:', error);
     }
   };
+  
+  // Backend UserBook'u uygulama Book modeline çevir
+  function convertUserBookToBook(userBook: any): any {
+    const currentPage = userBook.current_page || 0;
+    const progress = userBook.page_count > 0 ? 
+      Math.round((currentPage / userBook.page_count) * 100) : 0;
+
+    return {
+      id: userBook.id,
+      title: userBook.title,
+      author: userBook.author,
+      coverURL: userBook.cover_image_url || 'https://via.placeholder.com/200x300?text=Kapak+Yok',
+      pageCount: userBook.page_count || 0,
+      currentPage: currentPage,
+      progress: progress,
+      status: 'READING',
+      createdAt: new Date(userBook.createdAt),
+      notes: [],
+      genre: userBook.genre || 'Genel',
+      publishYear: new Date().getFullYear(),
+      publisher: 'Bilinmiyor',
+      description: '',
+      userId: currentUserId,
+    };
+  }
 
   // Load user data and reading stats
   useEffect(() => {
@@ -60,7 +106,7 @@ const HomeScreen = () => {
   // Focus effect to reload books when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadBooksFromStorage();
+      loadReadingBooksFromAPI();
     }, [currentUserId])
   );
 

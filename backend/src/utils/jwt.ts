@@ -22,3 +22,4 @@ export const verifyToken = (token: string): UserPayload => {
     throw new Error('Invalid token');
   }
 }; 
+ 
