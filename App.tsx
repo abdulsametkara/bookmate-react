@@ -5,20 +5,17 @@ import { Provider as ReduxProvider } from 'react-redux';
 // @ts-ignore
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
-import { ThemeProvider } from './src/contexts/ThemeContext';
 import store from './src/store';
 
 export default function App() {
   return (
     <ReduxProvider store={store}>
-      <ThemeProvider>
-        <SafeAreaProvider>
-          <NavigationContainer>
-            <StatusBar style="auto" />
-            <AppNavigator />
-          </NavigationContainer>
-        </SafeAreaProvider>
-      </ThemeProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <AppNavigator />
+        </NavigationContainer>
+      </SafeAreaProvider>
     </ReduxProvider>
   );
 } 

@@ -12,11 +12,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import * as bookSliceActions from '../store/bookSlice';
-import UserManager from '../utils/userManager';
-import type { User } from '../utils/userManager';
-import ReadingSessionManager from '../utils/readingSessionManager';
-import type { ReadingStats } from '../utils/readingSessionManager';
+import UserManager, { User } from '../utils/userManager';
+import ReadingSessionManager, { ReadingStats } from '../utils/readingSessionManager';
 import { Colors, Spacing, BorderRadius, FontSizes } from '../theme/theme';
+import ProgressModal from '../components/ProgressModal';
+import CustomToast from '../components/CustomToast';
 
 interface UserProfileProps {
   onNavigateToSettings?: () => void;
@@ -31,6 +31,27 @@ const UserProfile: React.FC<UserProfileProps> = ({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Modal ve toast state'leri
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Debug modal state changes
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🔍 UserProfile Modal state changed - visible:', logoutModalVisible);
+    }
+  }, [logoutModalVisible]);
+
+  // Toast gösterme fonksiyonu
+  const showToast = (type: typeof toastType, message: string) => {
+    setToastType(type);
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
+  };
 
   // Load user data and reading stats
   useEffect(() => {
@@ -65,39 +86,32 @@ const UserProfile: React.FC<UserProfileProps> = ({
 
   // Handle logout
   const handleLogout = () => {
-    Alert.alert(
-      'Çıkış Yap',
-      'Hesabınızdan çıkmak istediğinizden emin misiniz?',
-      [
-        {
-          text: 'İptal',
-          style: 'cancel'
-        },
-        {
-          text: 'Çıkış Yap',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('Logout pressed - starting logout process');
-              
-              // Use UserManager logout
-              const success = await UserManager.logout();
-              
-              if (success) {
-                console.log('Logout completed successfully');
-                // AppNavigator will automatically detect session change and redirect to login
-              } else {
-                Alert.alert('Hata', 'Çıkış yaparken bir hata oluştu.');
-              }
-              
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Hata', 'Çıkış yaparken bir hata oluştu.');
-            }
-          }
-        }
-      ]
-    );
+    setLogoutModalVisible(true);
+  };
+
+  // Gerçek çıkış işlemini gerçekleştir
+  const performLogout = async () => {
+    try {
+      console.log('Logout pressed - starting logout process');
+      
+      // Use UserManager logout
+      const success = await UserManager.logout();
+      
+      if (success) {
+        console.log('Logout completed successfully');
+        setLogoutModalVisible(false);
+        showToast('success', 'Başarıyla çıkış yapıldı');
+        // AppNavigator will automatically detect session change and redirect to login
+      } else {
+        setLogoutModalVisible(false);
+        showToast('error', 'Çıkış yaparken bir hata oluştu.');
+      }
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      setLogoutModalVisible(false);
+      showToast('error', 'Çıkış yaparken bir hata oluştu.');
+    }
   };
 
   const isGuestUser = currentUserId === 'guest_user';
@@ -245,6 +259,29 @@ const UserProfile: React.FC<UserProfileProps> = ({
           </View>
         </Surface>
       )}
+
+      {/* Logout Modal */}
+      <ProgressModal
+        visible={logoutModalVisible}
+        onClose={() => setLogoutModalVisible(false)}
+        type="warning"
+        title="Çıkış Yap"
+        subtitle="Hesabınızdan çıkmak istediğinizden emin misiniz?"
+        actionType="logout"
+        onAction={(action) => {
+          if (action === 'logout') {
+            performLogout();
+          }
+        }}
+      />
+      
+      {/* Custom Toast */}
+      <CustomToast
+        visible={toastVisible}
+        type={toastType}
+        message={toastMessage}
+        onHide={() => setToastVisible(false)}
+      />
     </View>
   );
 };

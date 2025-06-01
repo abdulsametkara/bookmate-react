@@ -156,7 +156,7 @@ const booksSlice = createSlice({
       const bookWithUser = {
         ...action.payload,
         userId: state.currentUserId || undefined,
-        createdAt: now,
+        createdAt: action.payload.createdAt || now,
         updatedAt: now
       };
       state.items.push(bookWithUser);
@@ -169,6 +169,7 @@ const booksSlice = createSlice({
         state.items[index] = {
           ...action.payload,
           userId: state.currentUserId || undefined,
+          createdAt: state.items[index].createdAt || now,
           updatedAt: now
         };
         // Async operations should be handled outside of reducers

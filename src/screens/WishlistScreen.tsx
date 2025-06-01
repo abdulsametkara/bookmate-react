@@ -19,6 +19,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, getApiUrl, getAuthHeaders } from '../config/api';
+import ProgressModal from '../components/ProgressModal';
+import CustomToast from '../components/CustomToast';
 
 interface GoogleBook {
   id: string;
@@ -79,6 +81,46 @@ const WishlistScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
 
+  // Animation states
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<'progress' | 'status' | 'completion' | 'error' | 'warning' | 'info' | 'loading' | 'delete' | 'favorite' | 'menu' | 'action'>('info');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalSubtitle, setModalSubtitle] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
+  const [toastMessage, setToastMessage] = useState('');
+  
+  // Modal aksiyon için state'ler
+  const [selectedWishlistId, setSelectedWishlistId] = useState('');
+  const [selectedBookTitle, setSelectedBookTitle] = useState('');
+  const [selectedBook, setSelectedBook] = useState<GoogleBook | null>(null);
+  const [actionType, setActionType] = useState('');
+
+  // Debug modal state changes
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🎭 WishlistScreen Modal state changed - visible:', modalVisible, 'type:', modalType);
+    }
+  }, [modalVisible, modalType]);
+
+  // Animation helper functions
+  const showModal = (type: typeof modalType, title: string, subtitle: string, actionType?: string) => {
+    setModalType(type);
+    setModalTitle(title);
+    setModalSubtitle(subtitle);
+    if (actionType) {
+      setActionType(actionType);
+    }
+    setModalVisible(true);
+  };
+
+  const showToast = (type: typeof toastType, message: string) => {
+    setToastType(type);
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
+  };
+
   // Sayfa yüklendiğinde kullanıcının istek listesini getir
   useEffect(() => {
     if (currentUserId) {
@@ -93,7 +135,7 @@ const WishlistScreen = () => {
       const token = await AsyncStorage.getItem('bookmate_auth_token');
       
       if (!token) {
-        Alert.alert('Hata', 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        showToast('error', 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
         return;
       }
 
@@ -116,7 +158,7 @@ const WishlistScreen = () => {
       }
     } catch (error) {
       console.error('❌ İstek listesi yükleme hatası:', error);
-      Alert.alert('Hata', 'İstek listesi yüklenirken bir hata oluştu.');
+      showToast('error', 'İstek listesi yüklenirken bir hata oluştu.');
     } finally {
       setIsLoading(false);
     }
@@ -139,11 +181,11 @@ const WishlistScreen = () => {
         console.log('📚 Arama sonuçları:', data.items.length, 'kitap bulundu');
       } else {
         setSearchResults([]);
-        Alert.alert('Sonuç Bulunamadı', 'Aradığınız kitap bulunamadı.');
+        showToast('info', 'Aradığınız kitap bulunamadı.');
       }
     } catch (error) {
       console.error('❌ Arama hatası:', error);
-      Alert.alert('Hata', 'Kitap arama sırasında bir hata oluştu.');
+      showToast('error', 'Kitap arama sırasında bir hata oluştu.');
     } finally {
       setIsSearching(false);
     }
@@ -155,22 +197,22 @@ const WishlistScreen = () => {
       const token = await AsyncStorage.getItem('bookmate_auth_token');
       
       if (!token) {
-        Alert.alert('Hata', 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        showToast('error', 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
         return;
       }
 
       // 1. Önce kitabı backend books tablosuna ekle
       const bookData: Partial<BackendBook> = {
-        title: googleBook.volumeInfo.title,
-        author: googleBook.volumeInfo.authors?.join(', ') || 'Bilinmeyen Yazar',
-        isbn: googleBook.volumeInfo.industryIdentifiers?.[0]?.identifier || '',
-        publisher: googleBook.volumeInfo.publisher || '',
+        title: googleBook.volumeInfo.title.replace(/\u0000/g, ''),
+        author: (googleBook.volumeInfo.authors?.join(', ') || 'Bilinmeyen Yazar').replace(/\u0000/g, ''),
+        isbn: (googleBook.volumeInfo.industryIdentifiers?.[0]?.identifier || '').replace(/\u0000/g, ''),
+        publisher: (googleBook.volumeInfo.publisher || '').replace(/\u0000/g, ''),
         published_year: googleBook.volumeInfo.publishedDate ? 
           parseInt(googleBook.volumeInfo.publishedDate.substring(0, 4)) : undefined,
         page_count: googleBook.volumeInfo.pageCount || 0,
         genre: 'Genel',
-        description: googleBook.volumeInfo.description || '',
-        cover_image_url: googleBook.volumeInfo.imageLinks?.thumbnail || '',
+        description: (googleBook.volumeInfo.description || '').replace(/\u0000/g, ''),
+        cover_image_url: (googleBook.volumeInfo.imageLinks?.thumbnail || '').replace(/\u0000/g, ''),
         language: 'tr'
       };
 
@@ -190,12 +232,12 @@ const WishlistScreen = () => {
         console.log('✅ Kitap backend\'e eklendi, ID:', bookId);
       } else if (bookResponse.status === 409) {
         // Kitap zaten varsa, ID'sini al (bu endpoint'i eklememiz gerekebilir)
-        Alert.alert('Uyarı', 'Bu kitap zaten sistemde mevcut.');
+        showToast('warning', 'Bu kitap zaten sistemde mevcut.');
         return;
       } else {
         const errorData = await bookResponse.json();
         console.error('❌ Kitap ekleme hatası:', errorData);
-        Alert.alert('Hata', 'Kitap sisteme eklenirken bir hata oluştu.');
+        showToast('error', 'Kitap sisteme eklenirken bir hata oluştu.');
         return;
       }
 
@@ -221,59 +263,55 @@ const WishlistScreen = () => {
         // Başarılı, listeyiç yeniden yükle
         await loadWishlist();
         
-        Alert.alert(
-          'Başarılı',
-          `"${bookData.title}" istek listenize eklendi.`,
-          [{ text: 'Tamam' }]
-        );
+        showToast('success', `"${bookData.title}" istek listenize eklendi.`);
         
         setShowResults(false);
         setSearchQuery('');
       } else {
         const errorData = await wishlistResponse.json();
         console.error('❌ İstek listesi hatası:', errorData);
-        Alert.alert('Hata', errorData.message || 'İstek listesine eklenirken bir hata oluştu.');
+        showToast('error', errorData.message || 'İstek listesine eklenirken bir hata oluştu.');
       }
 
     } catch (error) {
       console.error('❌ İstek listesine ekleme hatası:', error);
-      Alert.alert('Hata', 'İstek listesine eklerken bir hata oluştu.');
+      showToast('error', 'İstek listesine eklerken bir hata oluştu.');
     }
   };
 
   // İstek listesinden kaldır
   const removeFromWishlist = async (wishlistId: string, bookTitle: string) => {
-    Alert.alert(
-      'Kitabı Kaldır',
-      `"${bookTitle}" adlı kitabı istek listenizden kaldırmak istediğinizden emin misiniz?`,
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Kaldır',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const token = await AsyncStorage.getItem('bookmate_auth_token');
-              
-              const response = await fetch(getApiUrl(`/api/user/wishlists/${wishlistId}`), {
-                method: 'DELETE',
-                headers: getAuthHeaders(token || ''),
-              });
+    setSelectedWishlistId(wishlistId);
+    setSelectedBookTitle(bookTitle);
+    setActionType('confirm-remove');
+    showModal('warning', 'Kitabı Kaldır', `"${bookTitle}" adlı kitabı istek listenizden kaldırmak istediğinizden emin misiniz?`, 'confirm-remove');
+  };
 
-              if (response.ok) {
-                await loadWishlist();
-                Alert.alert('Başarılı', 'Kitap istek listenizden kaldırıldı.');
-              } else {
-                Alert.alert('Hata', 'Kitap kaldırılırken bir hata oluştu.');
-              }
-            } catch (error) {
-              console.error('❌ Kaldırma hatası:', error);
-              Alert.alert('Hata', 'Kitap kaldırılırken bir hata oluştu.');
-            }
-          }
-        }
-      ]
-    );
+  // Gerçek kaldırma işlemi
+  const confirmRemoveFromWishlist = async () => {
+    if (!selectedWishlistId) return;
+    
+    try {
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      
+      const response = await fetch(getApiUrl(`/api/user/wishlists/${selectedWishlistId}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(token || ''),
+      });
+
+      if (response.ok) {
+        await loadWishlist();
+        showToast('success', 'Kitap istek listenizden kaldırıldı.');
+      } else {
+        showToast('error', 'Kitap kaldırılırken bir hata oluştu.');
+      }
+    } catch (error) {
+      console.error('❌ Kaldırma hatası:', error);
+      showToast('error', 'Kitap kaldırılırken bir hata oluştu.');
+    } finally {
+      setSelectedWishlistId('');
+      setSelectedBookTitle('');
+    }
   };
 
   // Kitabı kütüphaneye ekle ve istek listesinden kaldır
@@ -298,56 +336,87 @@ const WishlistScreen = () => {
         // İstek listesini yeniden yükle (otomatik kaldırılmış olacak)
         await loadWishlist();
         
-        Alert.alert(
-          'Başarılı',
-          result.message || 'Kitap kütüphanenize eklendi.',
-          [{ text: 'Tamam' }]
-        );
+        // Success modal göster
+        setTimeout(() => {
+          showModal('completion', 'Kütüphaneye Eklendi!', result.message || 'Kitap kütüphanenize eklendi.');
+        }, 300);
       } else {
         const errorData = await response.json();
-        Alert.alert('Hata', errorData.message || 'Kütüphaneye eklenirken bir hata oluştu.');
+        showToast('error', errorData.message || 'Kütüphaneye eklenirken bir hata oluştu.');
       }
     } catch (error) {
       console.error('❌ Kütüphaneye ekleme hatası:', error);
-      Alert.alert('Hata', 'Kütüphaneye eklerken bir hata oluştu.');
+      showToast('error', 'Kütüphaneye eklerken bir hata oluştu.');
     }
   };
 
-  const showWishlistBookOptions = (item: WishlistItem) => {
-    Alert.alert(
-      item.title,
-      'Bu kitap için ne yapmak istiyorsunuz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Kütüphaneye Ekle',
-          onPress: () => addToLibrary(item)
-        },
-        {
-          text: 'Listeden Kaldır',
-          style: 'destructive',
-          onPress: () => removeFromWishlist(item.id, item.title)
-        }
-      ]
-    );
+  // Wishlist kitap seçenekleri
+  const showWishlistItemOptions = (item: WishlistItem) => {
+    setSelectedWishlistId(item.id);
+    setSelectedBookTitle(item.title);
+    setActionType('menu');
+    showModal('menu', item.title, 'Bu kitap için ne yapmak istiyorsunuz?', 'menu');
+  };
+
+  // Kitabı istek listesine ekle onay modalı
+  const showBookAddModal = (book: GoogleBook) => {
+    setSelectedBook(book);
+    setActionType('add');
+    setModalType('favorite');
+    setModalTitle('İstek Listesine Ekle');
+    setModalSubtitle(`"${book.volumeInfo.title}" adlı kitabı istek listenize eklemek istiyor musunuz?`);
+    setModalVisible(true);
   };
 
   const showBookOptions = (book: GoogleBook) => {
-    Alert.alert(
-      book.volumeInfo.title,
-      'Bu kitabı istek listenize eklemek istediğinizden emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'İstek Listesine Ekle',
-          onPress: () => addToWishlist(book)
+    setSelectedBook(book);
+    showBookAddModal(book);
+  };
+
+  // Modal buton aksiyonlarını handle et
+  const handleModalAction = (action: string) => {
+    setModalVisible(false);
+    
+    // Modal tipine göre aksiyon al
+    setTimeout(() => {
+      if (action === 'confirm-remove') {
+        confirmRemoveFromWishlist();
+      } else if (action === 'add') {
+        // Seçilen kitabı istek listesine ekle
+        if (selectedBook) {
+          addToWishlist(selectedBook);
+          setSelectedBook(null);
         }
-      ]
-    );
+      } else if (action === 'add-to-library') {
+        // Kitabı kütüphaneye ekle onayı
+        if (selectedWishlistId) {
+          const item = wishlist.find(w => w.id === selectedWishlistId);
+          if (item) {
+            addToLibrary(item);
+          }
+        }
+      } else if (action === 'edit') {
+        // Menu'den düzenle seçeneği
+        console.log('Edit action for wishlist item');
+      } else if (action === 'delete') {
+        // Menu'den kaldır seçeneği
+        if (selectedWishlistId && selectedBookTitle) {
+          removeFromWishlist(selectedWishlistId, selectedBookTitle);
+        }
+      } else if (action === 'menu-add-to-library') {
+        // Menu'den kütüphaneye ekle seçeneği
+        if (selectedWishlistId) {
+          const item = wishlist.find(w => w.id === selectedWishlistId);
+          if (item) {
+            addToLibrary(item);
+          }
+        }
+      }
+    }, 100);
   };
 
   const renderWishlistItem = ({ item }: { item: WishlistItem }) => (
-    <TouchableOpacity onPress={() => showWishlistBookOptions(item)}>
+    <TouchableOpacity onPress={() => showWishlistItemOptions(item)}>
       <Surface style={styles.wishlistItem}>
         <View style={styles.bookCover}>
           <Image 
@@ -362,7 +431,7 @@ const WishlistScreen = () => {
         </View>
         <TouchableOpacity 
           style={styles.menuButton}
-          onPress={() => showWishlistBookOptions(item)}
+          onPress={() => showWishlistItemOptions(item)}
         >
           <MaterialCommunityIcons name="dots-vertical" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
@@ -395,10 +464,7 @@ const WishlistScreen = () => {
         </View>
         <TouchableOpacity 
           style={styles.addButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            showBookOptions(item);
-          }}
+          onPress={() => showBookAddModal(item)}
         >
           <MaterialCommunityIcons name="plus" size={20} color={Colors.surface} />
         </TouchableOpacity>
@@ -407,82 +473,105 @@ const WishlistScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>İstek Listesi</Text>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <MaterialCommunityIcons name="magnify" size={20} color="#999999" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Bir kitap ara..."
-            placeholderTextColor="#A0A0A0"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={() => searchBooks(searchQuery)}
-            returnKeyType="search"
-          />
-          {isSearching && (
-            <ActivityIndicator size="small" color={Colors.primary} />
-          )}
+    <>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>İstek Listesi</Text>
         </View>
-      </View>
 
-      {/* Search Results */}
-      {showResults && (
-        <View style={styles.searchResultsContainer}>
-          <View style={styles.searchResultsHeader}>
-            <Text style={styles.searchResultsTitle}>Arama Sonuçları</Text>
-            <TouchableOpacity onPress={() => setShowResults(false)}>
-              <MaterialCommunityIcons name="close" size={24} color={Colors.textSecondary} />
-            </TouchableOpacity>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <MaterialCommunityIcons name="magnify" size={20} color="#999999" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Bir kitap ara..."
+              placeholderTextColor="#A0A0A0"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={() => searchBooks(searchQuery)}
+              returnKeyType="search"
+            />
+            {isSearching && (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            )}
           </View>
-          <FlatList
-            data={searchResults}
-            renderItem={renderSearchResult}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.searchResultsList}
-          />
         </View>
-      )}
 
-      {/* Wishlist Items */}
-      {!showResults && (
-        <>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loadingText}>İstek listeniz yükleniyor...</Text>
+        {/* Wishlist Items or Empty State */}
+        {!showResults && (
+          <>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.loadingText}>İstek listeniz yükleniyor...</Text>
+              </View>
+            ) : wishlist.length > 0 ? (
+              <FlatList
+                data={wishlist}
+                renderItem={renderWishlistItem}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.booksList}
+                onRefresh={loadWishlist}
+                refreshing={isLoading}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIconContainer}>
+                  <MaterialCommunityIcons name="heart-outline" size={48} color="#BBBBBB" />
+                </View>
+                <Text style={styles.emptyStateTitle}>İstek listeniz boş</Text>
+                <Text style={styles.emptyStateSubtitle}>
+                  Okumak istediğiniz kitapları arayarak istek listenize ekleyin
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+      </SafeAreaView>
+      
+      {/* Search Results in Modal Layer */}
+      {showResults && (
+        <View style={styles.searchResultsOverlay}>
+          <View style={styles.searchResultsContainer}>
+            <View style={styles.searchResultsHeader}>
+              <Text style={styles.searchResultsTitle}>Arama Sonuçları</Text>
+              <TouchableOpacity onPress={() => setShowResults(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
             </View>
-          ) : wishlist.length > 0 ? (
             <FlatList
-              data={wishlist}
-              renderItem={renderWishlistItem}
+              data={searchResults}
+              renderItem={renderSearchResult}
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.booksList}
-              onRefresh={loadWishlist}
-              refreshing={isLoading}
+              contentContainerStyle={styles.searchResultsList}
             />
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
-                <MaterialCommunityIcons name="heart-outline" size={48} color="#BBBBBB" />
-              </View>
-              <Text style={styles.emptyStateTitle}>İstek listeniz boş</Text>
-              <Text style={styles.emptyStateSubtitle}>
-                Okumak istediğiniz kitapları arayarak istek listenize ekleyin
-              </Text>
-            </View>
-          )}
-        </>
+          </View>
+        </View>
       )}
-    </SafeAreaView>
+      
+      {/* Progress Modal */}
+      <ProgressModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        type={modalType}
+        title={modalTitle}
+        subtitle={modalSubtitle}
+        actionType={actionType}
+        onAction={handleModalAction}
+      />
+      
+      {/* Custom Toast */}
+      <CustomToast
+        visible={toastVisible}
+        type={toastType}
+        message={toastMessage}
+        onHide={() => setToastVisible(false)}
+      />
+    </>
   );
 };
 
@@ -526,15 +615,15 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   searchResultsContainer: {
-    flex: 1,
+    width: '100%',
     backgroundColor: Colors.surface,
-    margin: Spacing.lg,
     borderRadius: BorderRadius.md,
-    elevation: 4,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    maxHeight: '80%',
   },
   searchResultsHeader: {
     flexDirection: 'row',
@@ -656,6 +745,18 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  searchResultsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    paddingHorizontal: Spacing.lg,
   },
 });
 

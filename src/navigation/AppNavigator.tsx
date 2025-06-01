@@ -47,11 +47,11 @@ const convertMockBooksToReduxFormat = (mockBooks: any[]): Book[] => {
     description: book.description,
     isbn: book.isbn,
     notes: book.notes || [],
-    createdAt: book.createdAt ? new Date(book.createdAt).toISOString() : new Date().toISOString(),
-    updatedAt: book.updatedAt ? new Date(book.updatedAt).toISOString() : new Date().toISOString(),
+    createdAt: book.createdAt ? (typeof book.createdAt === 'string' ? book.createdAt : new Date(book.createdAt).toISOString()) : new Date().toISOString(),
+    updatedAt: book.updatedAt ? (typeof book.updatedAt === 'string' ? book.updatedAt : new Date(book.updatedAt).toISOString()) : new Date().toISOString(),
     userId: book.userId,
     isJointReading: book.isJointReading || false,
-    startDate: book.startDate ? new Date(book.startDate).toISOString() : undefined,
+    startDate: book.startDate ? (typeof book.startDate === 'string' ? book.startDate : new Date(book.startDate).toISOString()) : undefined,
     isFavorite: book.isFavorite || false,
   }));
 };

@@ -237,7 +237,8 @@ const LibraryScreen = () => {
       currentPage: currentPage,
       progress: progress,
       status: status,
-      createdAt: new Date(userBook.createdAt),
+      createdAt: typeof userBook.createdAt === 'string' ? userBook.createdAt : new Date(userBook.createdAt).toISOString(),
+      updatedAt: typeof userBook.updatedAt === 'string' ? userBook.updatedAt : new Date(userBook.updatedAt).toISOString(),
       notes: [],
       genre: userBook.genre || 'Genel',
       publishYear: new Date().getFullYear(),
@@ -294,13 +295,30 @@ const LibraryScreen = () => {
 
   // Kitap detayına git
   const goToBookDetail = (bookId) => {
+    console.log('📖 LibraryScreen - Navigating to BookDetail with bookId:', bookId);
+    
     // Backend'den yüklenen kitabı bul
     const book = books.find(b => b.id === bookId);
+    console.log('📖 LibraryScreen - Found book:', book ? {
+      id: book.id,
+      title: book.title,
+      author: book.author
+    } : 'NOT_FOUND');
+    
+    console.log('📖 LibraryScreen - Full book object:', book);
+    console.log('📖 LibraryScreen - Navigation params will be:', {
+      bookId,
+      bookData: book,
+      onStatusChangeKey: refreshKey
+    });
+    
     navigation.navigate('BookDetail', { 
       bookId,
       bookData: book, // Kitap verisini direkt geçir
       onStatusChangeKey: refreshKey // fonksiyon yerine bir key gönder
     });
+    
+    console.log('📖 LibraryScreen - Navigation.navigate called');
   };
 
   // Status değişikliğini dinle ve veri yükle
@@ -473,13 +491,19 @@ const LibraryScreen = () => {
       ) : filteredBooks.length > 0 ? (
         <FlatList
           data={filteredBooks}
-          renderItem={({ item }) => (
-            <BookItem 
-              book={item} 
-              onPress={() => goToBookDetail(item.id)} 
-              viewMode={viewMode}
-            />
-          )}
+          renderItem={({ item }) => {
+            console.log('📖 FlatList rendering item:', item.id, item.title);
+            return (
+              <BookItem 
+                book={item} 
+                onPress={() => {
+                  console.log('📖 BookItem onPress called with item.id:', item.id);
+                  goToBookDetail(item.id);
+                }} 
+                viewMode={viewMode}
+              />
+            );
+          }}
           keyExtractor={(item) => item.id}
           numColumns={viewMode === 'grid' ? 2 : 1}
           key={viewMode} // Force re-render on layout change

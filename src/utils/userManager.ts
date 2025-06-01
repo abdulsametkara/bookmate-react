@@ -277,6 +277,122 @@ export class UserManager {
     }
   }
 
+  // Change password for current user
+  static async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🔐 UserManager: Attempting password change for user:', userId);
+      
+      // Guest kullanıcı şifre değiştiremez
+      if (userId === 'guest_user') {
+        return {
+          success: false,
+          message: 'Misafir kullanıcılar şifre değiştiremez. Lütfen önce hesap oluşturun.'
+        };
+      }
+
+      // Token'ı al
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.'
+        };
+      }
+
+      // Backend API çağrısı yap
+      const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.AUTH.CHANGE_PASSWORD), {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({
+          currentPassword: currentPassword,
+          newPassword: newPassword
+        })
+      });
+
+      console.log('📡 Password change API response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('❌ Password change API error:', errorData);
+        
+        return {
+          success: false,
+          message: errorData.message || 'Şifre değiştirilirken bir hata oluştu.'
+        };
+      }
+
+      const data = await response.json();
+      console.log('✅ Password change API success:', data);
+
+      return {
+        success: true,
+        message: data.message || 'Şifreniz başarıyla değiştirildi.'
+      };
+
+    } catch (error) {
+      console.error('❌ Password change error:', error);
+      
+      return {
+        success: false,
+        message: 'Bağlantı hatası. Lütfen internet bağlantınızı kontrol edin.'
+      };
+    }
+  }
+
+  // Verify current password (for password change validation)
+  static async verifyCurrentPassword(userId: string, password: string): Promise<boolean> {
+    try {
+      console.log('🔍 verifyCurrentPassword called with userId:', userId);
+      
+      // Guest kullanıcı için her zaman false döndür
+      if (userId === 'guest_user') {
+        console.log('❌ Guest user cannot verify password');
+        return false;
+      }
+
+      // Token kontrolü
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      console.log('🔑 Token exists:', !!token);
+      
+      if (!token) {
+        console.log('❌ No auth token found');
+        return false;
+      }
+
+      try {
+        console.log('📡 Attempting backend password verification...');
+        const apiUrl = getApiUrl(API_CONFIG.ENDPOINTS.AUTH.VERIFY_PASSWORD);
+        console.log('🌐 API URL:', apiUrl);
+        console.log('🔑 Auth headers:', getAuthHeaders(token));
+        
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: getAuthHeaders(token),
+          body: JSON.stringify({ password })
+        });
+
+        console.log('📡 Backend response status:', response.status);
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Backend verification result:', data);
+          return data.valid === true;
+        } else {
+          const errorData = await response.json();
+          console.log('❌ Backend verification failed:', errorData.message);
+          return false;
+        }
+      } catch (error) {
+        console.log('❌ Backend verification error:', error.message);
+        return false;
+      }
+
+    } catch (error) {
+      console.error('❌ Error verifying password:', error);
+      return false;
+    }
+  }
+
   // Generate unique user ID
   static generateUserId(): string {
     return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -294,6 +410,42 @@ export class UserManager {
       
     } catch (error) {
       console.error('Error migrating guest data:', error);
+    }
+  }
+
+  // Initialize password hash for existing users (for development/migration)
+  static async initializeUserPassword(userId: string, password: string): Promise<void> {
+    try {
+      const user = await this.getUserById(userId);
+      if (user && !user.passwordHash) {
+        console.log('🔐 Initializing password hash for user:', userId);
+        const updatedUser: User = {
+          ...user,
+          passwordHash: simpleHash(password),
+          updatedAt: new Date().toISOString()
+        };
+        await this.saveUser(updatedUser);
+        console.log('✅ Password hash initialized');
+      }
+    } catch (error) {
+      console.error('Error initializing password hash:', error);
+    }
+  }
+
+  // Debug function to check user data
+  static async debugUserData(userId: string): Promise<void> {
+    try {
+      const user = await this.getUserById(userId);
+      console.log('🔍 Debug - User data for', userId, ':', {
+        id: user?.id,
+        email: user?.email,
+        displayName: user?.displayName,
+        hasPasswordHash: !!user?.passwordHash,
+        passwordHash: user?.passwordHash,
+        createdAt: user?.createdAt
+      });
+    } catch (error) {
+      console.error('Error debugging user data:', error);
     }
   }
 }

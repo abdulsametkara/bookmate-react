@@ -4,13 +4,15 @@ import { Platform } from 'react-native';
 export const API_CONFIG = {
   BASE_URL: Platform.select({
     android: 'http://10.0.2.2:5000', // Android emülatör için localhost
-    default: 'http://10.22.7.154:5000', // Diğer platformlar için
+    default: 'http://localhost:5000', // Diğer platformlar için localhost
   }),
   ENDPOINTS: {
     AUTH: {
       LOGIN: '/api/auth/login',
       REGISTER: '/api/auth/register',
-      ME: '/api/auth/me'
+      ME: '/api/auth/me',
+      CHANGE_PASSWORD: '/api/auth/change-password',
+      VERIFY_PASSWORD: '/api/auth/verify-password'
     },
     BOOKS: {
       LIST: '/api/books',

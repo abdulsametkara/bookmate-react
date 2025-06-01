@@ -192,6 +192,100 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
   }
 });
 
+// Verify current password
+app.post('/api/auth/verify-password', authenticateToken, async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    console.log('🔍 Password verification request for user:', req.userId);
+
+    if (!password) {
+      return res.status(400).json({ message: 'Şifre gerekli' });
+    }
+
+    // Get user with password hash
+    const result = await pool.query('SELECT password FROM users WHERE id = $1', [req.userId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+    }
+
+    const user = result.rows[0];
+    
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    
+    console.log('✅ Password verification result:', isValidPassword);
+    
+    res.json({ 
+      valid: isValidPassword,
+      message: isValidPassword ? 'Şifre doğru' : 'Şifre hatalı'
+    });
+  } catch (error) {
+    console.error('Password verification error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Change password
+app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    console.log('🔐 Password change request for user:', req.userId);
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Mevcut şifre ve yeni şifre gerekli' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Yeni şifre en az 6 karakter olmalıdır' });
+    }
+
+    // Get current user
+    const userResult = await pool.query('SELECT password FROM users WHERE id = $1', [req.userId]);
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    
+    if (!isCurrentPasswordValid) {
+      console.log('❌ Current password verification failed');
+      return res.status(401).json({ message: 'Mevcut şifreniz hatalı' });
+    }
+
+    // Check if new password is different
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ message: 'Yeni şifreniz mevcut şifrenizden farklı olmalıdır' });
+    }
+
+    // Hash new password
+    const newHashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in database
+    await pool.query(
+      'UPDATE users SET password = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2',
+      [newHashedPassword, req.userId]
+    );
+
+    console.log('✅ Password updated successfully for user:', req.userId);
+
+    res.json({
+      success: true,
+      message: 'Şifreniz başarıyla değiştirildi'
+    });
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ message: 'Şifre değiştirilirken bir hata oluştu' });
+  }
+});
+
 // 📊 Dashboard endpoint
 app.get('/api/dashboard', authenticateToken, async (req, res) => {
   try {

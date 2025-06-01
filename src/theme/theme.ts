@@ -66,54 +66,54 @@ export const DarkTheme = {
   secondary: '#8B5CF6', // İkincil renk
   accent: '#34D399', // Açık yeşil
   
-  // Arka plan renkleri
-  background: '#111827', // Koyu ana arka plan
-  backgroundSecondary: '#1F2937', // Koyu ikincil arka plan
-  backgroundGray: '#374151', // Koyu gri arka plan
-  surface: '#1F2937',
-  surfaceSoft: '#242A37',
+  // Arka plan renkleri - Daha modern ve kontraslı
+  background: '#0F172A', // Çok koyu ana arka plan (slate-900)
+  backgroundSecondary: '#1E293B', // Koyu ikincil arka plan (slate-800)
+  backgroundGray: '#334155', // Koyu gri arka plan (slate-700)
+  surface: '#1E293B', // Kart ve yüzeyler için (slate-800)
+  surfaceSoft: '#0F172A', // Daha soft yüzey rengi
   
-  // Metin renkleri
-  text: '#F9FAFB', // Açık ana metin
-  textSecondary: '#D1D5DB', // Açık ikincil metin
-  textTertiary: '#9CA3AF', // Açık üçüncül metin
-  textPlaceholder: '#6B7280', // Koyu placeholder
+  // Metin renkleri - Daha iyi kontrast
+  text: '#F8FAFC', // Çok açık ana metin (slate-50)
+  textSecondary: '#CBD5E1', // Açık ikincil metin (slate-300)
+  textTertiary: '#94A3B8', // Açık üçüncül metin (slate-400)
+  textPlaceholder: '#64748B', // Koyu placeholder (slate-500)
   
-  // UI elementleri
-  border: '#374151', // Koyu border
-  borderLight: '#4B5563', // Açık koyu border
-  borderSoft: '#3F4956',
-  shadow: 'rgba(0, 0, 0, 0.3)', // Koyu gölge
-  shadowMedium: 'rgba(0, 0, 0, 0.4)',
+  // UI elementleri - Daha belirgin
+  border: '#475569', // Koyu border (slate-600)
+  borderLight: '#64748B', // Açık koyu border (slate-500)
+  borderSoft: '#475569',
+  shadow: 'rgba(0, 0, 0, 0.5)', // Daha güçlü gölge
+  shadowMedium: 'rgba(0, 0, 0, 0.6)',
   
-  // Durum renkleri
-  success: '#34D399',
-  warning: '#FBBF24',
-  error: '#F87171',
-  info: '#60A5FA',
+  // Durum renkleri - Daha canlı
+  success: '#10B981', // Emerald-500
+  warning: '#F59E0B', // Amber-500
+  error: '#EF4444', // Red-500
+  info: '#3B82F6', // Blue-500
   
   // Progress ve rating
   progressComplete: '#60A5FA',
-  progressBackground: '#374151',
-  rating: '#FDE047',
+  progressBackground: '#334155', // slate-700
+  rating: '#FDE047', // Yellow-300
   
   // Toggle ve switch
   toggleActive: '#60A5FA',
-  toggleInactive: '#4B5563',
+  toggleInactive: '#64748B', // slate-500
   
   // Özel renkler
-  bookCover: '#374151',
+  bookCover: '#334155', // slate-700
   avatar: '#8B5CF6',
-  backdrop: 'rgba(0, 0, 0, 0.7)',
-  notification: '#F87171',
+  backdrop: 'rgba(0, 0, 0, 0.8)', // Daha koyu backdrop
+  notification: '#EF4444',
   
-  // Dark mode soft renkler
-  cardBackground: '#1F2937',
-  sectionBackground: '#1A202C',
-  divider: '#374151',
-  headerBackground: '#1F2937',
-  warm: '#1F2937',
-  coolGray: '#1A202C',
+  // Dark mode soft renkler - Daha modern
+  cardBackground: '#1E293B', // slate-800
+  sectionBackground: '#0F172A', // slate-900
+  divider: '#475569', // slate-600
+  headerBackground: '#1E293B', // slate-800
+  warm: '#1E293B',
+  coolGray: '#0F172A',
   
   // Türler için renkler
   fiction: '#A78BFA', // Kurgu türü için açık mor

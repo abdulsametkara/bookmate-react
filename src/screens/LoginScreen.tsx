@@ -19,6 +19,10 @@ import { setCurrentUser, setBooks, loadBooks, saveBooks } from '../store/bookSli
 import UserManager from '../utils/userManager';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import { MOCK_BOOKS } from '../data/mockData';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_CONFIG, getApiUrl } from '../config/api';
+import ProgressModal from '../components/ProgressModal';
+import CustomToast from '../components/CustomToast';
 
 // MOCK_BOOKS'u Redux Book formatına çevir
 const convertMockBooksToReduxFormat = (mockBooks: any[]) => {
@@ -55,6 +59,15 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Animation states
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<'progress' | 'status' | 'completion' | 'error' | 'warning' | 'info' | 'loading' | 'delete' | 'favorite'>('info');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalSubtitle, setModalSubtitle] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
+  const [toastMessage, setToastMessage] = useState('');
+
   // Route params'dan email'i al
   useEffect(() => {
     if (route.params?.prefilledEmail) {
@@ -64,12 +77,12 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Hata', 'Email ve şifre alanları zorunludur.');
+      showToast('error', 'Email ve şifre alanları zorunludur.');
       return;
     }
 
     if (!isValidEmail(email)) {
-      Alert.alert('Hata', 'Geçerli bir email adresi giriniz.');
+      showToast('error', 'Geçerli bir email adresi giriniz.');
       return;
     }
 
@@ -80,7 +93,7 @@ const LoginScreen = () => {
       const user = await UserManager.authenticateUser(email.trim(), password);
 
       if (!user) {
-        Alert.alert('Hata', 'Email veya şifre hatalı.');
+        showToast('error', 'Email veya şifre hatalı.');
         setLoading(false);
         return;
       }
@@ -110,11 +123,13 @@ const LoginScreen = () => {
       setEmail('');
       setPassword('');
 
+      showToast('success', 'Başarıyla giriş yaptınız!');
+
       console.log('Login completed, user should be authenticated now');
 
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Hata', 'Giriş yaparken bir hata oluştu.');
+      showToast('error', 'Giriş yaparken bir hata oluştu.');
     } finally {
       setLoading(false);
     }
@@ -129,23 +144,29 @@ const LoginScreen = () => {
   };
 
   const continueAsGuest = () => {
-    Alert.alert(
-      'Misafir Olarak Devam Et',
-      'Hesap oluşturmadan devam etmek istediğinizden emin misiniz? Verileriniz sadece bu cihazda saklanacak.',
-      [
-        {
-          text: 'İptal',
-          style: 'cancel'
-        },
-        {
-          text: 'Misafir Olarak Devam Et',
-          onPress: async () => {
-            const guestUserId = await UserManager.initializeGuestSession();
-            dispatch(setCurrentUser(guestUserId));
-          }
-        }
-      ]
-    );
+    showModal('info', 'Misafir Olarak Devam Et', 'Hesap oluşturmadan devam etmek istediğinizden emin misiniz? Verileriniz sadece bu cihazda saklanacak.');
+  };
+
+  const handleGuestContinue = async () => {
+    setModalVisible(false);
+    const guestUserId = await UserManager.initializeGuestSession();
+    dispatch(setCurrentUser(guestUserId));
+    showToast('info', 'Misafir olarak devam ediyorsunuz.');
+  };
+
+  // Animation helper functions
+  const showModal = (type: typeof modalType, title: string, subtitle: string) => {
+    setModalType(type);
+    setModalTitle(title);
+    setModalSubtitle(subtitle);
+    setModalVisible(true);
+  };
+
+  const showToast = (type: typeof toastType, message: string) => {
+    setToastType(type);
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
   };
 
   return (
@@ -249,6 +270,23 @@ const LoginScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Progress Modal */}
+      <ProgressModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        type={modalType}
+        title={modalTitle}
+        subtitle={modalSubtitle}
+      />
+      
+      {/* Custom Toast */}
+      <CustomToast
+        visible={toastVisible}
+        type={toastType}
+        message={toastMessage}
+        onHide={() => setToastVisible(false)}
+      />
     </SafeAreaView>
   );
 };

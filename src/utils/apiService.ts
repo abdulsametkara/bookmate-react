@@ -61,6 +61,14 @@ export interface UserBookStats {
   };
 }
 
+interface APIResponse {
+  success: boolean;
+  status: number;
+  message: string;
+  data?: any;
+  errors?: any;
+}
+
 class APIService {
   /**
    * Get authentication token from AsyncStorage
@@ -497,6 +505,202 @@ class APIService {
       return { success: false, message: 'Failed to fetch favorite books' };
     }
   }
+
+  /**
+   * Delete a user book from collection
+   */
+  async deleteUserBook(userBookId: string): Promise<APIResponse> {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { success: false, status: 401, message: 'Authentication token not found' };
+      }
+
+      const response = await fetch(getApiUrl(`/api/user/books/${userBookId}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { success: true, status: response.status, message: data.message || 'Book removed successfully' };
+      } else {
+        return { 
+          success: false, 
+          status: response.status, 
+          message: data.message || 'Failed to remove book',
+          errors: data.errors
+        };
+      }
+    } catch (error) {
+      console.error('❌ Delete user book error:', error);
+      return { 
+        success: false, 
+        status: 500, 
+        message: 'Network error occurred while removing book' 
+      };
+    }
+  }
+
+  /**
+   * Add a note to a user book
+   */
+  async addUserBookNote(userBookId: string, noteData: { content: string }): Promise<{ success: boolean; note?: any; message?: string }> {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { success: false, message: 'Authentication token not found' };
+      }
+
+      const response = await fetch(getApiUrl(`/api/user/books/${userBookId}/notes`), {
+        method: 'POST',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(noteData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { success: true, note: data.note, message: data.message || 'Note added successfully' };
+      } else {
+        return { success: false, message: data.message || 'Failed to add note' };
+      }
+    } catch (error) {
+      console.error('❌ Add note error:', error);
+      return { success: false, message: 'Network error occurred while adding note' };
+    }
+  }
+
+  /**
+   * Update a note for a user book
+   */
+  async updateUserBookNote(userBookId: string, noteId: string, noteData: { content: string }): Promise<{ success: boolean; note?: any; message?: string }> {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { success: false, message: 'Authentication token not found' };
+      }
+
+      const response = await fetch(getApiUrl(`/api/user/books/${userBookId}/notes/${noteId}`), {
+        method: 'PUT',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify(noteData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { success: true, note: data.note, message: data.message || 'Note updated successfully' };
+      } else {
+        return { success: false, message: data.message || 'Failed to update note' };
+      }
+    } catch (error) {
+      console.error('❌ Update note error:', error);
+      return { success: false, message: 'Network error occurred while updating note' };
+    }
+  }
+
+  /**
+   * Delete a note from a user book
+   */
+  async deleteUserBookNote(userBookId: string, noteId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { success: false, message: 'Authentication token not found' };
+      }
+
+      const response = await fetch(getApiUrl(`/api/user/books/${userBookId}/notes/${noteId}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { success: true, message: data.message || 'Note deleted successfully' };
+      } else {
+        return { success: false, message: data.message || 'Failed to delete note' };
+      }
+    } catch (error) {
+      console.error('❌ Delete note error:', error);
+      return { success: false, message: 'Network error occurred while deleting note' };
+    }
+  }
+
+  /**
+   * Get notes for a user book
+   */
+  async getUserBookNotes(userBookId: string): Promise<{ success: boolean; notes?: any[]; message?: string }> {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return { success: false, message: 'Authentication token not found' };
+      }
+
+      const response = await fetch(getApiUrl(`/api/user/books/${userBookId}/notes`), {
+        method: 'GET',
+        headers: getAuthHeaders(token),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { success: true, notes: data.notes || [], message: data.message };
+      } else {
+        return { success: false, message: data.message || 'Failed to fetch notes' };
+      }
+    } catch (error) {
+      console.error('❌ Get notes error:', error);
+      return { success: false, message: 'Network error occurred while fetching notes' };
+    }
+  }
+
+  // Kullanıcının kitabını sil - Legacy static method
+  static deleteUserBook = async (bookId: string): Promise<APIResponse> => {
+    try {
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      
+      if (!token) {
+        return {
+          success: false,
+          status: 401,
+          message: 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.'
+        };
+      }
+      
+      const response = await fetch(getApiUrl(`/api/user/books/${bookId}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        return {
+          success: true,
+          status: response.status,
+          message: data.message || 'Kitap başarıyla silindi',
+          data: data
+        };
+      } else {
+        return {
+          success: false,
+          status: response.status,
+          message: data.message || 'Kitap silinirken bir hata oluştu',
+          errors: data.errors
+        };
+      }
+    } catch (error) {
+      console.error('DELETE book error:', error);
+      return {
+        success: false,
+        status: 500,
+        message: 'Bir hata oluştu. Lütfen tekrar deneyin.',
+      };
+    }
+  };
 }
 
 export default new APIService(); 

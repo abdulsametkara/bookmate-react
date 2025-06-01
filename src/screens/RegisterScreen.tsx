@@ -17,6 +17,11 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import { register } from '../services/authService';
+import { useAppDispatch } from '../store';
+import { setCurrentUser } from '../store/bookSlice';
+import UserManager from '../utils/userManager';
+import ProgressModal from '../components/ProgressModal';
+import CustomToast from '../components/CustomToast';
 
 type RootStackParamList = {
   Login: { prefilledEmail?: string };
@@ -37,6 +42,30 @@ const RegisterScreen = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Animation states
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<'progress' | 'status' | 'completion' | 'error' | 'warning' | 'info' | 'loading' | 'delete' | 'favorite'>('info');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalSubtitle, setModalSubtitle] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Animation helper functions
+  const showModal = (type: typeof modalType, title: string, subtitle: string) => {
+    setModalType(type);
+    setModalTitle(title);
+    setModalSubtitle(subtitle);
+    setModalVisible(true);
+  };
+
+  const showToast = (type: typeof toastType, message: string) => {
+    setToastType(type);
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -46,27 +75,27 @@ const RegisterScreen = () => {
 
   const validateForm = () => {
     if (!formData.displayName.trim()) {
-      Alert.alert('Hata', 'İsim soyisim alanı zorunludur.');
+      showToast('error', 'İsim soyisim alanı zorunludur.');
       return false;
     }
 
     if (!formData.email.trim()) {
-      Alert.alert('Hata', 'Email alanı zorunludur.');
+      showToast('error', 'Email alanı zorunludur.');
       return false;
     }
 
     if (!isValidEmail(formData.email)) {
-      Alert.alert('Hata', 'Geçerli bir email adresi giriniz.');
+      showToast('error', 'Geçerli bir email adresi giriniz.');
       return false;
     }
 
     if (formData.password.length < 6) {
-      Alert.alert('Hata', 'Şifre en az 6 karakter olmalıdır.');
+      showToast('error', 'Şifre en az 6 karakter olmalıdır.');
       return false;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Hata', 'Şifreler eşleşmiyor.');
+      showToast('error', 'Şifreler eşleşmiyor.');
       return false;
     }
 
@@ -94,24 +123,16 @@ const RegisterScreen = () => {
 
       console.log('✅ Registration successful:', response.user);
       
-      Alert.alert(
-        'Başarılı', 
-        'Hesabınız oluşturuldu! Şimdi giriş yapabilirsiniz.',
-        [
-          {
-            text: 'Giriş Yap',
-            onPress: () => {
-              navigation.navigate('Login', { 
-                prefilledEmail: formData.email 
-              });
-            }
-          }
-        ]
-      );
+      showModal('completion', 'Hesap Oluşturuldu!', 'Hesabınız başarıyla oluşturuldu. Giriş sayfasına yönlendiriliyorsunuz.');
+      
+      setTimeout(() => {
+        setModalVisible(false);
+        navigation.navigate('Login', { prefilledEmail: formData.email.trim() });
+      }, 2000);
 
     } catch (error: any) {
       console.error('❌ Registration error:', error);
-      Alert.alert('Hata', error.message || 'Hesap oluşturulurken bir hata oluştu.');
+      showToast('error', error.message || 'Hesap oluşturulurken bir hata oluştu.');
     } finally {
       setLoading(false);
     }
@@ -265,6 +286,23 @@ const RegisterScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Progress Modal */}
+      <ProgressModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        type={modalType}
+        title={modalTitle}
+        subtitle={modalSubtitle}
+      />
+      
+      {/* Custom Toast */}
+      <CustomToast
+        visible={toastVisible}
+        type={toastType}
+        message={toastMessage}
+        onHide={() => setToastVisible(false)}
+      />
     </SafeAreaView>
   );
 };

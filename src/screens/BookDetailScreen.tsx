@@ -11,7 +11,9 @@ import {
   ActivityIndicator, 
   Platform,
   Animated,
-  SafeAreaView
+  SafeAreaView,
+  TextInput,
+  Modal
 } from 'react-native';
 import { Text, Button, Surface, Divider, IconButton, FAB } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -22,13 +24,22 @@ import { MOCK_BOOKS } from '../data/mockData';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { updateBook, deleteBook, saveBooks, addBook } from '../store/bookSlice';
-// import * as ReduxModels from '../store/slices/booksSlice'; // Temporary disable
+import { updateBookProgress, updateBookStatus } from '../store/bookSlice';
 import CustomProgressBar from '../components/CustomProgressBar';
 import CustomButton from '../components/CustomButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import APIService from '../utils/apiService';
+import PageInput from '../components/PageInput';
+import ProgressModal from '../components/ProgressModal';
+import CustomToast from '../components/CustomToast';
 
 const { width } = Dimensions.get('window');
+
+type RootStackParamList = {
+  BookDetail: { bookId: string; bookData?: Book };
+  EditBook: { bookId: string };
+  ReadingTimer: { bookId: string };
+};
 
 const BookDetailScreen = () => {
   const navigation = useNavigation();
@@ -39,14 +50,30 @@ const BookDetailScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   
-  // Get bookId and bookData from route params
+  // Get bookId and bookData from route params - use directly without state
   const { bookId, bookData } = route.params as { bookId: string; bookData?: Book };
   
-  console.log('🔍 BookDetailScreen - Params:', { bookId, bookData: !!bookData });
+  console.log('🔍 BookDetailScreen - Route params:', { 
+    bookId, 
+    bookData: !!bookData ? {
+      id: bookData.id,
+      title: bookData.title,
+      author: bookData.author,
+      pageCount: bookData.pageCount,
+      currentPage: bookData.currentPage,
+      status: bookData.status
+    } : 'NO_BOOK_DATA'
+  });
+  console.log('🔍 BookDetailScreen - Raw bookData type:', typeof bookData);
+  console.log('🔍 BookDetailScreen - Raw bookData:', bookData);
   
   // State for image loading
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  
+  // State for loading book data from backend
+  const [isLoadingBookData, setIsLoadingBookData] = useState(false);
+  const [fetchedBookData, setFetchedBookData] = useState<Book | null>(null);
   
   // Get books from Redux store
   const libraryBooks = useSelector((state: RootState) => state.books.items);
@@ -64,7 +91,7 @@ const BookDetailScreen = () => {
       progress: 0,
       status: BookStatus.TO_READ,
       notes: [],
-      createdAt: new Date('2023-04-15'),
+      createdAt: new Date('2023-04-15').toISOString(),
       priority: 'high',
     },
     {
@@ -77,7 +104,7 @@ const BookDetailScreen = () => {
       progress: 0,
       status: BookStatus.TO_READ,
       notes: [],
-      createdAt: new Date('2023-05-20'),
+      createdAt: new Date('2023-05-20').toISOString(),
       priority: 'medium',
     },
     {
@@ -90,7 +117,7 @@ const BookDetailScreen = () => {
       progress: 42,
       status: BookStatus.READING,
       notes: [],
-      createdAt: new Date('2023-06-30'),
+      createdAt: new Date('2023-06-30').toISOString(),
       priority: 'medium',
     }
   ];
@@ -124,8 +151,24 @@ const BookDetailScreen = () => {
   // Create unified book data from available source
   let book: UnifiedBook | undefined;
   
-  // PRIORITY 1: Use bookData passed from LibraryScreen (backend data)
-  if (bookData) {
+  // PRIORITY 1: Use fetchedBookData from backend (if we had to fetch it manually)
+  if (fetchedBookData) {
+    book = {
+      id: fetchedBookData.id,
+      title: fetchedBookData.title,
+      author: fetchedBookData.author,
+      coverURL: fetchedBookData.coverURL,
+      pageCount: fetchedBookData.pageCount || 0,
+      currentPage: fetchedBookData.currentPage || 0,
+      progress: fetchedBookData.progress || 0,
+      status: fetchedBookData.status,
+      publishYear: fetchedBookData.publishYear || undefined,
+      genre: fetchedBookData.genre || undefined,
+      description: fetchedBookData.description || undefined
+    };
+  } 
+  // PRIORITY 2: Use bookData passed from LibraryScreen (backend data)
+  else if (bookData && typeof bookData === 'object' && bookData.id) {
     book = {
       id: bookData.id,
       title: bookData.title,
@@ -213,22 +256,134 @@ const BookDetailScreen = () => {
     };
   }, []);
 
+  // Modal states
+  const [progressModalVisible, setProgressModalVisible] = useState(false);
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [completionModalVisible, setCompletionModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Toast states
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Note management states
+  const [noteModalVisible, setNoteModalVisible] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [notes, setNotes] = useState<Array<{
+    id?: string; 
+    content?: string; 
+    createdAt?: string | Date;
+  }>>([]);
+
+  // Kitap işlemleri için modal state'leri
+  const [bookActionModalVisible, setBookActionModalVisible] = useState(false);
+  const [bookActionModalTitle, setBookActionModalTitle] = useState('');
+  const [bookActionModalSubtitle, setBookActionModalSubtitle] = useState('');
+  const [actionType, setActionType] = useState('');
+
+  // Sync notes when book data changes
+  useEffect(() => {
+    if (book && book.id) {
+      setNotes(book.notes || []);
+    }
+  }, [book?.id, book?.notes?.length]); // Only re-run when book ID or notes length changes
+
+  // Load notes from backend and AsyncStorage when component mounts
+  useEffect(() => {
+    const loadNotes = async () => {
+      if (!book?.id || !currentUserId) return;
+
+      console.log('📝 Loading notes for book:', book.id);
+
+      try {
+        let loadedNotes: any[] = [];
+
+        // 1. Önce Redux'dan kontrol et
+        if (reduxBook && reduxBook.notes && reduxBook.notes.length > 0) {
+          console.log('📝 Redux\'dan notlar yüklendi:', reduxBook.notes.length);
+          loadedNotes = reduxBook.notes;
+        }
+        // 2. Backend'den not yüklemeyi dene (eğer bookData varsa) - Optional
+        else if (bookData && bookData.id) {
+          console.log('📝 Backend\'den notlar yükleniyor...');
+          try {
+            const result = await APIService.getUserBookNotes(bookData.id);
+            if (result.success && result.notes && result.notes.length > 0) {
+              console.log('✅ Backend\'den notlar yüklendi:', result.notes.length);
+              loadedNotes = result.notes.map((note: any) => ({
+                id: note.id,
+                content: note.content,
+                createdAt: note.created_at || note.createdAt
+              }));
+            } else {
+              console.log('📝 Backend\'de not bulunamadı veya endpoint mevcut değil');
+            }
+          } catch (error) {
+            console.log('⚠️ Backend not endpoint mevcut değil, AsyncStorage kullanılıyor');
+          }
+        }
+
+        // 3. Eğer henüz not yoksa AsyncStorage'dan yükle
+        if (loadedNotes.length === 0) {
+          try {
+            const noteStorageKey = `bookmate_notes_${book.id}_${currentUserId}`;
+            const storedNotes = await AsyncStorage.getItem(noteStorageKey);
+            if (storedNotes) {
+              const parsedNotes = JSON.parse(storedNotes);
+              if (Array.isArray(parsedNotes) && parsedNotes.length > 0) {
+                console.log('📝 AsyncStorage\'dan notlar yüklendi:', parsedNotes.length);
+                loadedNotes = parsedNotes;
+              }
+            }
+          } catch (error) {
+            console.error('❌ AsyncStorage not yükleme hatası:', error);
+          }
+        }
+
+        // Notları state'e set et
+        if (loadedNotes.length > 0) {
+          setNotes(loadedNotes);
+          console.log('📝 Toplam yüklenen not sayısı:', loadedNotes.length);
+        } else {
+          console.log('📝 Hiç not bulunamadı');
+          setNotes([]);
+        }
+
+      } catch (error) {
+        console.error('❌ Not yükleme genel hatası:', error);
+        setNotes([]);
+      }
+    };
+
+    loadNotes();
+  }, [book?.id, currentUserId, bookData?.id, reduxBook?.id]); // Dependencies for note loading
+
+  // Toast helper function
+  const showToast = (type: typeof toastType, message: string) => {
+    setToastType(type);
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
+  };
+
   // If book not found, show error and go back
   if (!book) {
-    // Biraz bekleyelim sonra hata gösterip geri dönelim
-    // Bu şekilde sonsuz döngüye girmekten kaçınıyoruz
-    setTimeout(() => {
-      Alert.alert('Hata', 'Kitap bulunamadı');
-      navigation.goBack();
-    }, 100);
+    if (isLoadingBookData) {
+      return (
+        <View style={[styles.container, styles.loadingContainer]}>
+          <StatusBar backgroundColor={Colors.background} barStyle="dark-content" />
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Kitap bilgileri yükleniyor...</Text>
+        </View>
+      );
+    }
     
-    // Yükleniyor içeriği göster
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Yükleniyor...</Text>
-      </View>
-    );
+    showToast('error', 'Kitap bulunamadı');
+    navigation.goBack();
+    return null;
   }
   
   // Bu noktada kitap bulunmuştur, bilgisine erişilebilir
@@ -300,7 +455,7 @@ const BookDetailScreen = () => {
           console.log('✅ Backend ilerleme güncellemesi başarılı');
         } else {
           console.error('❌ Backend ilerleme güncellemesi başarısız:', result.message);
-          Alert.alert("Hata", result.message || "İlerleme kaydedilirken bir hata oluştu.");
+          showToast('error', result.message || "İlerleme kaydedilirken bir hata oluştu.");
           return;
         }
       }
@@ -346,32 +501,21 @@ const BookDetailScreen = () => {
       if (currentPage >= book.pageCount && book.status !== BookStatus.COMPLETED) {
         book.status = BookStatus.COMPLETED;
         setReadingStatus(BookStatus.COMPLETED);
+        // Kitap tamamlandı modal'ı göster
+        setCompletionModalVisible(true);
       } else if (currentPage > 0 && book.status === BookStatus.TO_READ) {
         book.status = BookStatus.READING;
         setReadingStatus(BookStatus.READING);
+        // İlerleme modal'ı göster
+        setProgressModalVisible(true);
+      } else {
+        // Normal ilerleme modal'ı göster
+        setProgressModalVisible(true);
       }
       
-      // Kullanıcıya bilgi ver
-      Alert.alert(
-        "İlerleme Güncellendi",
-        `Kitap ilerlemeniz ${currentPage}. sayfa olarak kaydedildi.${
-          prevPage !== currentPage && currentPage >= book.pageCount 
-            ? '\n\nTebrikler! Kitabı tamamladınız.' 
-            : ''
-        }`,
-        [{ 
-          text: "Tamam",
-          onPress: () => {
-            // Kitap tamamlandıysa, kitaplık ekranına dön
-            if (prevPage !== currentPage && currentPage >= book.pageCount) {
-              setTimeout(updateMainScreen, 500);
-            }
-          }
-        }]
-      );
     } catch (error) {
       console.error("İlerleme kaydetme hatası:", error);
-      Alert.alert("Hata", "İlerleme kaydedilirken bir hata oluştu.");
+      showToast('error', "İlerleme kaydedilirken bir hata oluştu.");
     }
   };
 
@@ -420,7 +564,7 @@ const BookDetailScreen = () => {
           console.error('❌ Backend durum güncellemesi başarısız:', result.message);
           // Hata durumunda eski duruma geri dön
           setReadingStatus(prevStatus);
-          Alert.alert("Hata", result.message || "Kitap durumu güncellenirken bir hata oluştu.");
+          showToast('error', result.message || "Kitap durumu güncellenirken bir hata oluştu.");
           return;
         }
       }
@@ -446,28 +590,26 @@ const BookDetailScreen = () => {
         }
       }
       
-      // Kullanıcıya bilgi ver
-      Alert.alert(
-        "Durum Güncellendi",
-        `Kitap durumu "${status === BookStatus.READING ? 'Okuyorum' : 
-          status === BookStatus.COMPLETED ? 'Tamamlandı' : 'Okuma Listem'}" olarak değiştirildi.`,
-        [{ 
-          text: "Tamam",
-          onPress: () => {
-            // Kütüphane ekranına dönüldüğünde yenilenmesini sağla
-            if (status !== prevStatus) {
-              setTimeout(() => {
-                navigation.goBack();
-              }, 500);
-            }
-          }
-        }]
-      );
+      // Durum değişikliği modal'ını göster
+      const statusMessages = {
+        [BookStatus.READING]: 'Kitap "Okuyorum" listesine eklendi',
+        [BookStatus.COMPLETED]: 'Tebrikler! Kitabı tamamladınız',
+        [BookStatus.TO_READ]: 'Kitap "Okuma Listem"e eklendi'
+      };
+      
+      setModalMessage(statusMessages[status]);
+      
+      if (status === BookStatus.COMPLETED) {
+        setCompletionModalVisible(true);
+      } else {
+        setStatusModalVisible(true);
+      }
+      
     } catch (error) {
       console.error("Durum güncelleme hatası:", error);
-      Alert.alert("Hata", "Kitap durumu güncellenirken bir hata oluştu.");
+      showToast('error', "Kitap durumu güncellenirken bir hata oluştu.");
       // Hata durumunda eski duruma geri dön
-      setReadingStatus(prevStatus);
+      setReadingStatus(readingStatus);
     }
   };
 
@@ -476,62 +618,327 @@ const BookDetailScreen = () => {
   };
 
   const showBookMenu = () => {
-    Alert.alert(
-      'Kitap Seçenekleri',
-      'Bu kitap için ne yapmak istiyorsunuz?',
-      [
-        {
-          text: 'İptal',
-          style: 'cancel'
-        },
-        {
-          text: 'Düzenle',
-          onPress: () => {
-            navigation.navigate('EditBook', { bookId: book.id });
-          }
-        },
-        {
-          text: 'Kitabı Sil',
-          style: 'destructive',
-          onPress: handleDeleteBook
-        }
-      ]
-    );
+    showBookActionModal('book-menu', 'Kitap Seçenekleri', 'Bu kitap için ne yapmak istiyorsunuz?');
   };
 
-  const handleDeleteBook = () => {
-    Alert.alert(
-      'Kitabı Sil',
-      `"${book.title}" adlı kitabı kütüphanenizden kaldırmak istediğinizden emin misiniz?`,
-      [
-        {
-          text: 'İptal',
-          style: 'cancel'
-        },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: () => {
-            try {
-              if (reduxBook) {
-                // Redux'tan sil
-                dispatch(deleteBook(book.id));
-                Alert.alert('Başarılı', 'Kitap kütüphanenizden kaldırıldı.');
-                navigation.goBack();
-              } else {
-                // Mock data'dan sil (geliştirme aşamasında)
-                Alert.alert('Başarılı', 'Kitap listeden kaldırıldı.');
-                navigation.goBack();
-              }
-            } catch (error) {
-              console.error('Silme hatası:', error);
-              Alert.alert('Hata', 'Kitap silinirken bir hata oluştu.');
+  const handleBookMenuAction = (action: string) => {
+    setBookActionModalVisible(false);
+    setTimeout(() => {
+      if (action === 'edit') {
+        navigation.navigate('EditBook', { bookId: book.id });
+      } else if (action === 'delete') {
+        handleDeleteConfirmation();
+      } else if (action === 'confirm-delete') {
+        handleDeleteBook();
+      }
+    }, 300);
+  };
+
+  // Kitap silme onay fonksiyonu
+  const handleDeleteConfirmation = () => {
+    showBookActionModal('warning', 'Kitabı Sil', `"${book.title}" adlı kitabı kütüphanenizden kaldırmak istediğinizden emin misiniz?`);
+    setActionType('confirm-delete');
+  };
+
+  // Kitabı silme işlemi
+  const handleDeleteBook = async () => {
+    try {
+      if (bookData && bookData.id) {
+        // Backend'den kitabı sil - bookData.id kullanarak user_book ID'sini kullan
+        console.log('🗑️ Backend\'den kitap siliniyor, ID:', bookData.id);
+        
+        const result = await APIService.deleteUserBook(bookData.id);
+        if (result.success) {
+          console.log('✅ Backend\'den silme başarılı');
+          showToast('success', 'Kitap kütüphanenizden kaldırıldı.');
+          setTimeout(() => {
+            navigation.goBack();
+          }, 300);
+        } else {
+          console.error('❌ Backend silme hatası:', result.message);
+          showToast('error', result.message || 'Kitap silinirken bir hata oluştu.');
+        }
+      } else if (reduxBook) {
+        // Redux'tan sil
+        console.log('🗑️ Redux\'tan kitap siliniyor, ID:', book.id);
+        dispatch(deleteBook(book.id));
+        showToast('success', 'Kitap kütüphanenizden kaldırıldı.');
+        setTimeout(() => {
+          navigation.goBack();
+        }, 300);
+      } else {
+        // Mock data'dan sil (geliştirme aşamasında)
+        console.log('🗑️ Mock data\'dan kitap siliniyor');
+        showToast('success', 'Kitap listeden kaldırıldı.');
+        setTimeout(() => {
+          navigation.goBack();
+        }, 300);
+      }
+    } catch (error) {
+      console.error('❌ Silme hatası:', error);
+      showToast('error', 'Kitap silinirken bir hata oluştu.');
+    }
+  };
+
+  // Kitap işlemleri için modal gösterme fonksiyonu
+  const showBookActionModal = (type: string, title: string, subtitle: string) => {
+    setActionType(type);
+    setBookActionModalTitle(title);
+    setBookActionModalSubtitle(subtitle);
+    setBookActionModalVisible(true);
+  };
+
+  // Not ekleme fonksiyonları
+  const openNoteModal = () => {
+    setNewNoteContent('');
+    setIsEditMode(false);
+    setEditingNoteId(null);
+    setNoteModalVisible(true);
+  };
+
+  const openEditNoteModal = (note: any) => {
+    setNewNoteContent(note.content || '');
+    setIsEditMode(true);
+    setEditingNoteId(note.id);
+    setNoteModalVisible(true);
+  };
+
+  const saveNote = async () => {
+    if (!newNoteContent.trim()) {
+      showToast('warning', 'Not içeriği boş olamaz');
+      return;
+    }
+
+    try {
+      if (isEditMode && editingNoteId) {
+        // Not düzenleme modu
+        const updatedNotes = notes.map(note => 
+          note.id === editingNoteId 
+            ? { ...note, content: newNoteContent.trim(), updatedAt: new Date().toISOString() }
+            : note
+        );
+        setNotes(updatedNotes);
+
+        // Backend'e güncelleme gönder (eğer bookData varsa) - Optional, hata olursa devam et
+        if (bookData && bookData.id) {
+          console.log('📝 Backend\'de not güncelleniyor:', { bookId: bookData.id, noteId: editingNoteId });
+          try {
+            const result = await APIService.updateUserBookNote(bookData.id, editingNoteId, {
+              content: newNoteContent.trim()
+            });
+            if (result.success) {
+              console.log('✅ Backend not güncellemesi başarılı');
+            } else {
+              console.log('⚠️ Backend not güncellemesi mevcut değil, sadece local kayıt yapılıyor');
             }
+          } catch (error) {
+            console.log('⚠️ Backend not endpoint mevcut değil, sadece local kayıt yapılıyor');
           }
         }
-      ]
-    );
+
+        // Redux'ta da güncelle (eğer reduxBook varsa)
+        if (reduxBook) {
+          const updatedBook = {
+            ...reduxBook,
+            notes: updatedNotes
+          };
+          dispatch(updateBook(updatedBook));
+          
+          // AsyncStorage'a kaydet
+          if (currentUserId) {
+            const allBooks = libraryBooks.map(b => 
+              b.id === updatedBook.id ? updatedBook : b
+            );
+            await saveBooks(allBooks, currentUserId);
+          }
+        }
+
+        // Eğer Redux book yoksa, notları AsyncStorage'a ayrı olarak kaydet
+        if (!reduxBook) {
+          const noteStorageKey = `bookmate_notes_${book.id}_${currentUserId}`;
+          await AsyncStorage.setItem(noteStorageKey, JSON.stringify(updatedNotes));
+          console.log('📝 Notlar AsyncStorage\'a kaydedildi:', noteStorageKey);
+        }
+
+        showToast('success', 'Not başarıyla güncellendi');
+      } else {
+        // Yeni not ekleme modu
+        const newNote = {
+          id: Date.now().toString(),
+          content: newNoteContent.trim(),
+          createdAt: new Date().toISOString()
+        };
+
+        const updatedNotes = [...notes, newNote];
+        setNotes(updatedNotes);
+
+        // Backend'e not kaydet (eğer bookData varsa) - Optional, hata olursa devam et
+        if (bookData && bookData.id) {
+          console.log('📝 Backend\'e not kaydediliyor:', { bookId: bookData.id, note: newNote });
+          try {
+            const result = await APIService.addUserBookNote(bookData.id, {
+              content: newNote.content
+            });
+            if (result.success) {
+              console.log('✅ Backend not kaydetme başarılı');
+              // Backend'den dönen note ID'sini kullan
+              if (result.note && result.note.id) {
+                newNote.id = result.note.id;
+                const finalNotes = updatedNotes.map(n => n.id === Date.now().toString() ? newNote : n);
+                setNotes(finalNotes);
+              }
+            } else {
+              console.log('⚠️ Backend not kaydetme mevcut değil, sadece local kayıt yapılıyor');
+            }
+          } catch (error) {
+            console.log('⚠️ Backend not endpoint mevcut değil, sadece local kayıt yapılıyor');
+          }
+        }
+        
+        // Redux'ta da güncelle (eğer reduxBook varsa)
+        if (reduxBook) {
+          const updatedBook = {
+            ...reduxBook,
+            notes: updatedNotes
+          };
+          dispatch(updateBook(updatedBook));
+          
+          // AsyncStorage'a kaydet
+          if (currentUserId) {
+            const allBooks = libraryBooks.map(b => 
+              b.id === updatedBook.id ? updatedBook : b
+            );
+            await saveBooks(allBooks, currentUserId);
+          }
+        }
+
+        // Eğer Redux book yoksa, notları AsyncStorage'a ayrı olarak kaydet
+        if (!reduxBook) {
+          const noteStorageKey = `bookmate_notes_${book.id}_${currentUserId}`;
+          await AsyncStorage.setItem(noteStorageKey, JSON.stringify(updatedNotes));
+          console.log('📝 Notlar AsyncStorage\'a kaydedildi:', noteStorageKey);
+        }
+        
+        showToast('success', 'Not başarıyla kaydedildi');
+      }
+      
+      setNoteModalVisible(false);
+      setNewNoteContent('');
+      setIsEditMode(false);
+      setEditingNoteId(null);
+      
+    } catch (error) {
+      console.error('❌ Not kaydetme hatası:', error);
+      showToast('error', 'Not kaydedilirken bir hata oluştu');
+    }
   };
+
+  const deleteNote = async (noteId: string) => {
+    try {
+      const updatedNotes = notes.filter(note => note.id !== noteId);
+      setNotes(updatedNotes);
+      
+      // Backend'den not sil (eğer bookData varsa) - Optional, hata olursa devam et
+      if (bookData && bookData.id) {
+        console.log('🗑️ Backend\'den not siliniyor:', { bookId: bookData.id, noteId });
+        try {
+          const result = await APIService.deleteUserBookNote(bookData.id, noteId);
+          if (result.success) {
+            console.log('✅ Backend not silme başarılı');
+          } else {
+            console.log('⚠️ Backend not silme mevcut değil, sadece local silme yapılıyor');
+          }
+        } catch (error) {
+          console.log('⚠️ Backend not endpoint mevcut değil, sadece local silme yapılıyor');
+        }
+      }
+      
+      // Redux'ta da güncelle (eğer reduxBook varsa)
+      if (reduxBook) {
+        const updatedBook = {
+          ...reduxBook,
+          notes: updatedNotes
+        };
+        dispatch(updateBook(updatedBook));
+        
+        // AsyncStorage'a kaydet
+        if (currentUserId) {
+          const allBooks = libraryBooks.map(b => 
+            b.id === updatedBook.id ? updatedBook : b
+          );
+          await saveBooks(allBooks, currentUserId);
+        }
+      }
+
+      // Eğer Redux book yoksa, notları AsyncStorage'a ayrı olarak kaydet
+      if (!reduxBook) {
+        const noteStorageKey = `bookmate_notes_${book.id}_${currentUserId}`;
+        await AsyncStorage.setItem(noteStorageKey, JSON.stringify(updatedNotes));
+        console.log('🗑️ Notlar AsyncStorage\'dan silindi:', noteStorageKey);
+      }
+      
+      showToast('success', 'Not silindi');
+      
+    } catch (error) {
+      console.error('❌ Not silme hatası:', error);
+      showToast('error', 'Not silinirken bir hata oluştu');
+    }
+  };
+
+  // If bookData is not passed or invalid, fetch from backend
+  useEffect(() => {
+    const loadBookDataFromBackend = async () => {
+      if (!bookData || typeof bookData !== 'object' || !bookData.id) {
+        console.log('🔄 BookDetailScreen - bookData invalid, fetching from backend with bookId:', bookId);
+        setIsLoadingBookData(true);
+        
+        try {
+          // Fetch all books from backend and find the one we need
+          const result = await APIService.getUserBooks();
+          if (result.success && result.books) {
+            const foundBook = result.books.find((userBook: any) => userBook.id === bookId);
+            if (foundBook) {
+              console.log('✅ BookDetailScreen - Found book in backend:', {
+                id: foundBook.id,
+                title: foundBook.title,
+                author: foundBook.author
+              });
+              
+              // Convert UserBook to Book format
+              const convertedBook: Book = {
+                id: foundBook.id,
+                title: foundBook.title,
+                author: foundBook.author,
+                coverURL: foundBook.cover_image_url || 'https://via.placeholder.com/200x300?text=Kapak+Yok',
+                pageCount: foundBook.page_count || 0,
+                currentPage: foundBook.current_page || 0,
+                progress: foundBook.page_count > 0 ? Math.round((foundBook.current_page || 0) / foundBook.page_count * 100) : 0,
+                status: foundBook.status === 'reading' ? BookStatus.READING :
+                        foundBook.status === 'completed' ? BookStatus.COMPLETED : BookStatus.TO_READ,
+                createdAt: foundBook.createdAt || new Date().toISOString(),
+                updatedAt: foundBook.updatedAt || new Date().toISOString(),
+                notes: [],
+                genre: foundBook.genre || 'Genel',
+                publishYear: new Date().getFullYear(),
+                publisher: 'Bilinmiyor',
+                description: '',
+              };
+              
+              setFetchedBookData(convertedBook);
+            } else {
+              console.log('❌ BookDetailScreen - Book not found in backend');
+            }
+          }
+        } catch (error) {
+          console.error('❌ BookDetailScreen - Error fetching book data:', error);
+        } finally {
+          setIsLoadingBookData(false);
+        }
+      }
+    };
+    
+    loadBookDataFromBackend();
+  }, [bookId, bookData]);
 
   return (
     <View style={styles.container}>
@@ -566,7 +973,7 @@ const BookDetailScreen = () => {
                 )}
                 
                 <Image
-                  source={{ uri: book.coverURL || 'https://via.placeholder.com/300x450?text=Kapak+Yok' }}
+                  source={{ uri: bookData.coverURL || 'https://via.placeholder.com/300x450?text=Kapak+Yok' }}
                   style={[
                     styles.coverImage, 
                     { width: width * 0.35, height: width * 0.5 }
@@ -580,41 +987,41 @@ const BookDetailScreen = () => {
             </View>
 
             <View style={styles.bookInfo}>
-              <Text style={styles.bookTitle} numberOfLines={3}>{book.title}</Text>
-              <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>
+              <Text style={styles.bookTitle} numberOfLines={3}>{bookData.title}</Text>
+              <Text style={styles.bookAuthor} numberOfLines={1}>{bookData.author}</Text>
               
               <View style={styles.statsContainer}>
                 {/* Sayfa sayısı */}
                 <View style={styles.statItem}>
                   <MaterialCommunityIcons name="book-open-page-variant" size={16} color={Colors.primary} />
-                  <Text style={styles.statLabel}>{book.pageCount} sayfa</Text>
+                  <Text style={styles.statLabel}>{bookData.pageCount} sayfa</Text>
                 </View>
                 
                 {/* Yayın yılı */}
-                {book.publishYear && (
+                {bookData.publishYear && (
                   <View style={styles.statItem}>
                     <MaterialCommunityIcons name="calendar" size={16} color={Colors.primary} />
-                    <Text style={styles.statLabel}>{book.publishYear}</Text>
+                    <Text style={styles.statLabel}>{bookData.publishYear}</Text>
                   </View>
                 )}
                 
                 {/* Tür bilgisi */}
-                {book.genre && (
+                {bookData.genre && (
                   <View style={styles.statItem}>
                     <MaterialCommunityIcons name="tag" size={16} color={Colors.primary} />
-                    <Text style={styles.statLabel}>{book.genre}</Text>
+                    <Text style={styles.statLabel}>{bookData.genre}</Text>
                   </View>
                 )}
               </View>
 
               {/* Durum bilgisi etiketi */}
               <View style={styles.statusChipContainer}>
-                <Surface style={[styles.statusChip, { backgroundColor: getStatusColor(book.status) }]}>
+                <Surface style={[styles.statusChip, { backgroundColor: getStatusColor(bookData.status) }]}>
                   <MaterialCommunityIcons 
                     name={
-                      book.status === BookStatus.READING 
+                      bookData.status === BookStatus.READING 
                         ? 'book-open' 
-                        : book.status === BookStatus.COMPLETED 
+                        : bookData.status === BookStatus.COMPLETED 
                           ? 'check-circle' 
                           : 'bookmark'
                     } 
@@ -623,9 +1030,9 @@ const BookDetailScreen = () => {
                     style={{marginRight: 4}}
                   />
                   <Text style={styles.statusText}>
-                    {book.status === BookStatus.READING 
+                    {bookData.status === BookStatus.READING 
                       ? 'Okuyorum' 
-                      : book.status === BookStatus.COMPLETED 
+                      : bookData.status === BookStatus.COMPLETED 
                         ? 'Tamamlandı' 
                         : 'Okuma Listem'}
                   </Text>
@@ -635,12 +1042,12 @@ const BookDetailScreen = () => {
           </View>
 
           {/* İlerleme bölümü - sadece READING durumunda */}
-          {book.status === BookStatus.READING && (
+          {bookData.status === BookStatus.READING && (
             <View style={styles.progressSection}>
               <View style={styles.progressHeader}>
                 <Text style={styles.sectionTitle}>Okuma İlerlemesi</Text>
                 <Text style={styles.progressPercent}>
-                  %{book.progress || Math.round((currentPage / book.pageCount) * 100)}
+                  %{bookData.progress || Math.round((currentPage / bookData.pageCount) * 100)}
                 </Text>
               </View>
               
@@ -650,8 +1057,8 @@ const BookDetailScreen = () => {
                 onPress={(event) => updateProgressFromTouch(event)}
               >
                 <CustomProgressBar
-                  progress={currentPage / book.pageCount}
-                  color={getProgressColor(currentPage / book.pageCount)}
+                  progress={currentPage / bookData.pageCount}
+                  color={getProgressColor(currentPage / bookData.pageCount)}
                   style={styles.progressBar}
                 />
               </TouchableOpacity>
@@ -659,27 +1066,11 @@ const BookDetailScreen = () => {
               <View style={styles.pageInputSection}>
                 <Text style={styles.currentPageLabel}>Mevcut Sayfa</Text>
                 <View style={styles.pageControlContainer}>
-                  <View style={styles.pageControls}>
-                    <IconButton
-                      icon="minus"
-                      size={20}
-                      mode="contained"
-                      containerColor="#F2F2F7"
-                      iconColor={Colors.text}
-                      onPress={() => updatePageNumber(currentPage - 1)}
-                      disabled={currentPage <= 0}
-                    />
-                    <Text style={styles.currentPageValue}>{currentPage}</Text>
-                    <IconButton
-                      icon="plus"
-                      size={20}
-                      mode="contained"
-                      containerColor="#F2F2F7"
-                      iconColor={Colors.text}
-                      onPress={() => updatePageNumber(currentPage + 1)}
-                      disabled={currentPage >= book.pageCount}
-                    />
-                  </View>
+                  <PageInput
+                    currentPage={currentPage}
+                    maxPage={bookData.pageCount}
+                    onPageChange={updatePageNumber}
+                  />
                   <CustomButton 
                     mode="contained" 
                     onPress={saveProgress}
@@ -702,19 +1093,19 @@ const BookDetailScreen = () => {
             <TouchableOpacity
               style={[
                 styles.statusButton, 
-                book.status === BookStatus.TO_READ && styles.statusButtonActive,
-                {backgroundColor: book.status === BookStatus.TO_READ ? getStatusColor(BookStatus.TO_READ) : Colors.surface}
+                bookData.status === BookStatus.TO_READ && styles.statusButtonActive,
+                {backgroundColor: bookData.status === BookStatus.TO_READ ? getStatusColor(BookStatus.TO_READ) : Colors.surface}
               ]}
               onPress={() => updateReadingStatus(BookStatus.TO_READ)}
             >
               <MaterialCommunityIcons 
                 name="bookmark-outline" 
                 size={16} 
-                color={book.status === BookStatus.TO_READ ? Colors.surface : getStatusColor(BookStatus.TO_READ)} 
+                color={bookData.status === BookStatus.TO_READ ? Colors.surface : getStatusColor(BookStatus.TO_READ)} 
               />
               <Text style={[
                 styles.statusButtonText,
-                {color: book.status === BookStatus.TO_READ ? Colors.surface : getStatusColor(BookStatus.TO_READ)}
+                {color: bookData.status === BookStatus.TO_READ ? Colors.surface : getStatusColor(BookStatus.TO_READ)}
               ]}>
                 Okuma Listem
               </Text>
@@ -723,19 +1114,19 @@ const BookDetailScreen = () => {
             <TouchableOpacity
               style={[
                 styles.statusButton,
-                book.status === BookStatus.READING && styles.statusButtonActive,
-                {backgroundColor: book.status === BookStatus.READING ? getStatusColor(BookStatus.READING) : Colors.surface}
+                bookData.status === BookStatus.READING && styles.statusButtonActive,
+                {backgroundColor: bookData.status === BookStatus.READING ? getStatusColor(BookStatus.READING) : Colors.surface}
               ]}
               onPress={() => updateReadingStatus(BookStatus.READING)}
             >
               <MaterialCommunityIcons 
                 name="book-open-variant" 
                 size={16} 
-                color={book.status === BookStatus.READING ? Colors.surface : getStatusColor(BookStatus.READING)} 
+                color={bookData.status === BookStatus.READING ? Colors.surface : getStatusColor(BookStatus.READING)} 
               />
               <Text style={[
                 styles.statusButtonText,
-                {color: book.status === BookStatus.READING ? Colors.surface : getStatusColor(BookStatus.READING)}
+                {color: bookData.status === BookStatus.READING ? Colors.surface : getStatusColor(BookStatus.READING)}
               ]}>
                 Okuyorum
               </Text>
@@ -744,19 +1135,19 @@ const BookDetailScreen = () => {
             <TouchableOpacity
               style={[
                 styles.statusButton,
-                book.status === BookStatus.COMPLETED && styles.statusButtonActive,
-                {backgroundColor: book.status === BookStatus.COMPLETED ? getStatusColor(BookStatus.COMPLETED) : Colors.surface}
+                bookData.status === BookStatus.COMPLETED && styles.statusButtonActive,
+                {backgroundColor: bookData.status === BookStatus.COMPLETED ? getStatusColor(BookStatus.COMPLETED) : Colors.surface}
               ]}
               onPress={() => updateReadingStatus(BookStatus.COMPLETED)}
             >
               <MaterialCommunityIcons 
                 name="check-circle-outline" 
                 size={16} 
-                color={book.status === BookStatus.COMPLETED ? Colors.surface : getStatusColor(BookStatus.COMPLETED)} 
+                color={bookData.status === BookStatus.COMPLETED ? Colors.surface : getStatusColor(BookStatus.COMPLETED)} 
               />
               <Text style={[
                 styles.statusButtonText,
-                {color: book.status === BookStatus.COMPLETED ? Colors.surface : getStatusColor(BookStatus.COMPLETED)}
+                {color: bookData.status === BookStatus.COMPLETED ? Colors.surface : getStatusColor(BookStatus.COMPLETED)}
               ]}>
                 Tamamlandı
               </Text>
@@ -771,15 +1162,37 @@ const BookDetailScreen = () => {
             <Text style={styles.sectionTitle}>Notlar</Text>
           </View>
           
-          {book.notes && book.notes.length > 0 ? (
+          {notes && notes.length > 0 ? (
             <View style={styles.notesList}>
-              {book.notes.map((note, index) => (
-                <View key={index} style={styles.noteItem}>
-                  <Text style={styles.noteContent}>{note.content || 'Not içeriği'}</Text>
+              {notes.map((note, index) => (
+                <View key={note.id || index} style={styles.noteItem}>
+                  <View style={styles.noteHeader}>
+                    <Text style={styles.noteTitle}>Not {index + 1}</Text>
+                    <View style={styles.noteActions}>
+                      <TouchableOpacity 
+                        onPress={() => openEditNoteModal(note)}
+                        style={styles.editNoteButton}
+                      >
+                        <MaterialCommunityIcons name="pencil-outline" size={16} color="#2196F3" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => deleteNote(note.id)}
+                        style={styles.deleteNoteButton}
+                      >
+                        <MaterialCommunityIcons name="delete-outline" size={16} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <Text style={styles.noteContent}>{note.content}</Text>
                   <View style={styles.noteFooter}>
-                    <Text style={styles.notePage}>Sayfa: {note.page || '?'}</Text>
                     <Text style={styles.noteDate}>
-                      {note.createdAt ? (typeof note.createdAt === 'string' ? note.createdAt : new Date(note.createdAt).toLocaleDateString()) : 'Tarih yok'}
+                      {note.createdAt ? new Date(note.createdAt).toLocaleDateString('tr-TR', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 'Tarih yok'}
                     </Text>
                   </View>
                 </View>
@@ -792,9 +1205,9 @@ const BookDetailScreen = () => {
             </View>
           )}
           
-          <TouchableOpacity
-            style={styles.addNoteButton}
-            onPress={() => {/* Not ekleme fonksiyonu */}}
+          <TouchableOpacity 
+            style={styles.noteButton}
+            onPress={openNoteModal}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" style={{marginRight: 8}} />
             <Text style={styles.addNoteButtonLabel}>Not Ekle</Text>
@@ -802,13 +1215,13 @@ const BookDetailScreen = () => {
         </View>
         
         {/* Kitap hakkında bölümü - opsiyonel */}
-        {book.description && book.description.trim() !== '' && (
+        {bookData.description && bookData.description.trim() !== '' && (
           <Surface style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons name="information-outline" size={24} color={Colors.primary} />
               <Text style={styles.sectionTitle}>Kitap Hakkında</Text>
             </View>
-            <Text style={styles.descriptionText}>{book.description}</Text>
+            <Text style={styles.descriptionText}>{bookData.description}</Text>
           </Surface>
         )}
       </ScrollView>
@@ -818,8 +1231,140 @@ const BookDetailScreen = () => {
         style={styles.fab}
         icon="timer-outline"
         label="OKUMAYA BAŞLA"
-        onPress={() => navigation.navigate('ReadingTimer', { bookId: book.id })}
+        onPress={() => navigation.navigate('ReadingTimer', { bookId: bookData.id })}
         color="#FFF"
+      />
+
+      {/* Modern Progress Modals */}
+      <ProgressModal
+        visible={progressModalVisible}
+        onClose={() => setProgressModalVisible(false)}
+        page={currentPage}
+        totalPages={bookData.pageCount}
+        bookTitle={bookData.title}
+        type="progress"
+      />
+
+      <ProgressModal
+        visible={statusModalVisible}
+        onClose={() => {
+          setStatusModalVisible(false);
+          // Durum değişikliğinden sonra ana ekrana dön
+          setTimeout(() => navigation.goBack(), 300);
+        }}
+        page={currentPage}
+        totalPages={bookData.pageCount}
+        bookTitle={bookData.title}
+        type="status"
+        message={modalMessage}
+      />
+
+      <ProgressModal
+        visible={completionModalVisible}
+        onClose={() => {
+          setCompletionModalVisible(false);
+          // Kitap tamamlandıktan sonra ana ekrana dön
+          setTimeout(() => navigation.goBack(), 300);
+        }}
+        page={currentPage}
+        totalPages={bookData.pageCount}
+        bookTitle={bookData.title}
+        type="completion"
+      />
+
+      {/* Custom Toast */}
+      <CustomToast
+        visible={toastVisible}
+        type={toastType}
+        message={toastMessage}
+        onHide={() => setToastVisible(false)}
+      />
+
+      {/* Note Modal */}
+      <Modal
+        visible={noteModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setNoteModalVisible(false);
+          setNewNoteContent('');
+        }}
+      >
+        <View style={styles.noteModalOverlay}>
+          <View style={styles.noteModalContainer}>
+            <View style={styles.noteModalHeader}>
+              <Text style={styles.noteModalTitle}>
+                {isEditMode ? 'Not Düzenle' : 'Not Ekle'}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  setNoteModalVisible(false);
+                  setNewNoteContent('');
+                  setIsEditMode(false);
+                  setEditingNoteId(null);
+                }}
+                style={styles.noteModalCloseButton}
+              >
+                <MaterialCommunityIcons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.noteModalSubtitle}>
+              "{book.title}" kitabı hakkında {isEditMode ? 'notunuzu düzenleyin' : 'genel notunuzu yazın'}
+            </Text>
+            
+            <View style={styles.noteModalContent}>
+              <TextInput
+                style={styles.noteTextInput}
+                value={newNoteContent}
+                onChangeText={setNewNoteContent}
+                placeholder="Notunuzu buraya yazın..."
+                placeholderTextColor={Colors.textTertiary}
+                multiline
+                numberOfLines={12}
+                textAlignVertical="top"
+              />
+              
+              <View style={styles.noteModalActions}>
+                <TouchableOpacity
+                  style={[styles.noteModalButton, styles.noteModalCancelButton]}
+                  onPress={() => {
+                    setNoteModalVisible(false);
+                    setNewNoteContent('');
+                    setIsEditMode(false);
+                    setEditingNoteId(null);
+                  }}
+                >
+                  <Text style={styles.noteModalCancelText}>İptal</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.noteModalButton, styles.noteModalSaveButton]}
+                  onPress={saveNote}
+                >
+                  <MaterialCommunityIcons name="content-save" size={16} color={Colors.surface} />
+                  <Text style={styles.noteModalSaveText}>
+                    {isEditMode ? 'Güncelle' : 'Kaydet'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Book Action Modal */}
+      <ProgressModal
+        visible={bookActionModalVisible}
+        onClose={() => setBookActionModalVisible(false)}
+        page={currentPage}
+        totalPages={book.pageCount}
+        bookTitle={book.title}
+        type={actionType === 'confirm-delete' ? 'warning' : 'book-menu'}
+        title={bookActionModalTitle}
+        subtitle={bookActionModalSubtitle}
+        actionType={actionType}
+        onAction={handleBookMenuAction}
       />
     </View>
   );
@@ -1155,6 +1700,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  noteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  noteTitle: {
+    fontSize: FontSizes.sm,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  noteActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editNoteButton: {
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.backgroundGray,
+    marginRight: Spacing.sm,
+  },
+  deleteNoteButton: {
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.backgroundGray,
+  },
   noteContent: {
     fontSize: FontSizes.md,
     color: Colors.text,
@@ -1165,11 +1736,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: Spacing.xs,
-  },
-  notePage: {
-    fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
-    fontWeight: '600',
   },
   noteDate: {
     fontSize: FontSizes.sm,
@@ -1192,7 +1758,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     textAlign: 'center',
   },
-  addNoteButton: {
+  noteButton: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,
     marginTop: Spacing.sm,
@@ -1248,6 +1814,101 @@ const styles = StyleSheet.create({
   progressBarContainer: {
     flex: 1,
     marginBottom: Spacing.xl,
+  },
+  noteModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: Spacing.md,
+  },
+  noteModalContainer: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    maxHeight: '80%',
+    minHeight: '60%',
+    shadowColor: Colors.shadowMedium,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  noteModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  noteModalTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  noteModalCloseButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.backgroundGray,
+  },
+  noteModalSubtitle: {
+    fontSize: FontSizes.md,
+    color: Colors.textSecondary,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  noteModalContent: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  noteTextInput: {
+    backgroundColor: Colors.backgroundGray,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    fontSize: FontSizes.md,
+    flex: 1,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minHeight: 200,
+  },
+  noteModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  noteModalButton: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flex: 1,
+    justifyContent: 'center',
+    marginHorizontal: Spacing.xs,
+  },
+  noteModalCancelButton: {
+    backgroundColor: Colors.backgroundGray,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  noteModalSaveButton: {
+    backgroundColor: Colors.primary,
+  },
+  noteModalCancelText: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  noteModalSaveText: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: Colors.surface,
+    marginLeft: Spacing.xs,
   },
 });
 

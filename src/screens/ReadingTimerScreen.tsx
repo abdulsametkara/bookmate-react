@@ -17,9 +17,12 @@ import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import { useSelector } from 'react-redux';
-import { RootState } from '../store';
+import { RootState, useAppDispatch } from '../store';
+import { updateBookStatus } from '../store/bookSlice';
 import ReadingSessionManager, { ReadingStats } from '../utils/readingSessionManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomToast from '../components/CustomToast';
+import { useToast } from '../hooks/useToast';
 
 // Timer durumu için interface
 interface TimerState {
@@ -34,6 +37,8 @@ interface TimerState {
 
 const ReadingTimerScreen = () => {
   const navigation = useNavigation();
+  const dispatch = useAppDispatch();
+  const { toast, showSuccess, showError, showInfo, hideToast } = useToast();
   const intervalRef = useRef(null);
   const appState = useRef(AppState.currentState);
   
@@ -97,6 +102,20 @@ const ReadingTimerScreen = () => {
           setSessionSeconds(timerState.sessionSeconds);
         }
       }
+      
+      // Eğer kaydedilmiş state yoksa veya seçili kitap yoksa, "READING" durumundaki kitabı otomatik seç
+      if (!savedState || !JSON.parse(savedState).selectedBookId) {
+        const readingBook = reduxBooks.find(book => book.status === 'READING');
+        if (readingBook) {
+          setSelectedBook(readingBook);
+          console.log('Otomatik olarak "READING" durumundaki kitap seçildi:', readingBook.title);
+        } else if (reduxBooks.length > 0) {
+          // Eğer READING durumunda kitap yoksa, ilk kitabı seç
+          const firstBook = reduxBooks[0];
+          setSelectedBook(firstBook);
+          console.log('READING durumunda kitap bulunamadı, ilk kitap seçildi:', firstBook.title);
+        }
+      }
     } catch (error) {
       console.error('Error loading timer state:', error);
     }
@@ -139,8 +158,29 @@ const ReadingTimerScreen = () => {
   // Load reading stats on mount
   useEffect(() => {
     loadReadingStats();
-    loadTimerState();
-  }, [currentUserId]);
+    if (reduxBooks.length > 0) {
+      loadTimerState();
+    }
+  }, [currentUserId, reduxBooks]);
+
+  // Otomatik kitap seçimi - reduxBooks değiştiğinde "READING" durumundaki kitabı seç
+  useEffect(() => {
+    // Sadece selectedBook yoksa ve reduxBooks yüklenmişse otomatik seçim yap
+    if (!selectedBook && reduxBooks.length > 0) {
+      const readingBook = reduxBooks.find(book => book.status === 'READING');
+      if (readingBook) {
+        setSelectedBook(readingBook);
+        console.log('Otomatik olarak "READING" durumundaki kitap seçildi:', readingBook.title);
+      } else {
+        // Eğer READING durumunda kitap yoksa, ilk kitabı seç
+        const firstBook = reduxBooks[0];
+        if (firstBook) {
+          setSelectedBook(firstBook);
+          console.log('READING durumunda kitap bulunamadı, ilk kitap seçildi:', firstBook.title);
+        }
+      }
+    }
+  }, [reduxBooks, selectedBook]);
 
   // Save timer state whenever it changes (but not during app state transitions)
   const [isAppStateChanging, setIsAppStateChanging] = useState(false);
@@ -260,12 +300,12 @@ const ReadingTimerScreen = () => {
 
   const startTimer = async () => {
     if (!selectedBook) {
-      Alert.alert('Kitap Seçin', 'Lütfen önce okuyacağınız kitabı seçin.');
+      showError('Lütfen önce okuyacağınız kitabı seçin.');
       return;
     }
 
     if (!currentUserId) {
-      Alert.alert('Hata', 'Kullanıcı bilgisi bulunamadı.');
+      showError('Kullanıcı bilgisi bulunamadı.');
       return;
     }
 
@@ -277,6 +317,25 @@ const ReadingTimerScreen = () => {
         selectedBook.currentPage || 0
       );
       
+      // Kitabı otomatik olarak "READING" durumuna geçir
+      if (selectedBook.status !== 'READING') {
+        dispatch(updateBookStatus({ 
+          id: selectedBook.id, 
+          status: 'READING' 
+        }));
+        
+        // Local selectedBook state'ini de güncelle
+        setSelectedBook({
+          ...selectedBook,
+          status: 'READING'
+        });
+        
+        showSuccess(`"${selectedBook.title}" okuma listesine eklendi ve zamanlayıcı başlatıldı!`);
+        console.log('Kitap otomatik olarak "READING" durumuna geçirildi:', selectedBook.title);
+      } else {
+        showInfo('Zamanlayıcı başlatıldı. İyi okumalar!');
+      }
+      
       setCurrentSessionId(sessionId);
       setStartPage(selectedBook.currentPage || 0);
       setIsRunning(true);
@@ -285,7 +344,7 @@ const ReadingTimerScreen = () => {
       console.log('Timer started, session ID:', sessionId);
     } catch (error) {
       console.error('Error starting reading session:', error);
-      Alert.alert('Hata', 'Okuma seansı başlatılamadı.');
+      showError('Okuma seansı başlatılamadı.');
     }
   };
 
@@ -324,14 +383,13 @@ const ReadingTimerScreen = () => {
         const readingSeconds = sessionSeconds % 60;
         console.log('Session finished successfully, reading time:', sessionSeconds, 'seconds (', readingMinutes, 'minutes', readingSeconds, 'seconds)');
         
-        Alert.alert(
-          'Okuma Seansı Kaydedildi', 
+        showSuccess(
           `${formatTime(sessionSeconds).formatted} okuma süresi bugünün toplamına eklendi.`,
-          [{ text: 'Tamam' }]
-    );
+          4000
+        );
       } catch (error) {
         console.error('Error ending reading session:', error);
-        Alert.alert('Hata', 'Okuma seansı kaydedilemedi.');
+        showError('Okuma seansı kaydedilemedi.');
       }
     } else {
       // Session yoksa veya süre 0 ise sadece timer'ı sıfırla
@@ -358,7 +416,7 @@ const ReadingTimerScreen = () => {
   const handleBookSelection = (book) => {
     setSelectedBook(book);
     setShowBookSelectionModal(false);
-    Alert.alert('Kitap Seçildi', `"${book.title}" zamanlayıcı için seçildi.`);
+    showSuccess(`"${book.title}" zamanlayıcı için seçildi.`);
   };
 
   const renderBookItem = ({ item }) => (
@@ -593,6 +651,16 @@ const ReadingTimerScreen = () => {
           />
         </SafeAreaView>
       </Modal>
+      
+      {/* Custom Toast */}
+      <CustomToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        duration={toast.duration}
+        onHide={hideToast}
+        action={toast.action}
+      />
     </SafeAreaView>
   );
 };

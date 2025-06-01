@@ -18,6 +18,7 @@ const HomeScreen = () => {
   const books = useAppSelector((state) => state.books.items);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Backend API'den reading kitapları yükle
   const loadReadingBooksFromAPI = async () => {
@@ -72,7 +73,7 @@ const HomeScreen = () => {
       currentPage: currentPage,
       progress: progress,
       status: 'READING',
-      createdAt: new Date(userBook.createdAt),
+      createdAt: new Date(userBook.createdAt).toISOString(),
       notes: [],
       genre: userBook.genre || 'Genel',
       publishYear: new Date().getFullYear(),
@@ -169,12 +170,12 @@ const HomeScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: Colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: Colors.surface }]}>
         <View style={styles.headerContent}>
-          <Text style={styles.greeting}>Ana Sayfa</Text>
-          <Text style={styles.appName}>BookMate</Text>
+          <Text style={[styles.greeting, { color: Colors.textSecondary }]}>Ana Sayfa</Text>
+          <Text style={[styles.appName, { color: Colors.primary }]}>BookMate</Text>
         </View>
         <TouchableOpacity style={styles.settingsButton} onPress={goToProfile}>
           <MaterialCommunityIcons name="cog" size={24} color={Colors.textSecondary} />
@@ -188,15 +189,15 @@ const HomeScreen = () => {
       >
         {/* Current Reading Progress */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Okuma İlerlemeniz</Text>
+          <Text style={[styles.sectionTitle, { color: Colors.text }]}>Okuma İlerlemeniz</Text>
           
           {currentlyReading ? (
             <TouchableOpacity 
-              style={styles.progressCard}
+              style={[styles.progressCard, { backgroundColor: Colors.surface }]}
               onPress={goToReadingTimer}
             >
               <View style={styles.progressHeader}>
-                <Text style={styles.currentlyReadingLabel}>ŞU ANDA OKUNAN:</Text>
+                <Text style={[styles.currentlyReadingLabel, { color: Colors.textSecondary }]}>ŞU ANDA OKUNAN:</Text>
               </View>
               
               <View style={styles.progressContent}>
@@ -209,9 +210,9 @@ const HomeScreen = () => {
                 </View>
                 
                 <View style={styles.bookDetails}>
-                  <Text style={styles.bookTitle}>{currentlyReading.title}</Text>
-                  <Text style={styles.bookAuthor}>{currentlyReading.author}</Text>
-                  <Text style={styles.pageInfo}>
+                  <Text style={[styles.bookTitle, { color: Colors.text }]}>{currentlyReading.title}</Text>
+                  <Text style={[styles.bookAuthor, { color: Colors.textSecondary }]}>{currentlyReading.author}</Text>
+                  <Text style={[styles.pageInfo, { color: Colors.textTertiary }]}>
                     {currentlyReading.currentPage || 0}/{currentlyReading.pageCount || 0} sayfa
                   </Text>
                 </View>
@@ -219,7 +220,7 @@ const HomeScreen = () => {
               
               <View style={styles.progressSection}>
                 <View style={styles.progressInfo}>
-                  <Text style={styles.progressPercentage}>%{Math.round(currentlyReading.progress || 0)} Tamamlandı</Text>
+                  <Text style={[styles.progressPercentage, { color: Colors.text }]}>%{Math.round(currentlyReading.progress || 0)} Tamamlandı</Text>
                   <MaterialCommunityIcons 
                     name="chevron-right" 
                     size={20} 
@@ -227,11 +228,11 @@ const HomeScreen = () => {
                   />
                 </View>
                 <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBar}>
+                  <View style={[styles.progressBar, { backgroundColor: Colors.backgroundGray }]}>
                     <View 
                       style={[
                         styles.progressFill, 
-                        { width: `${currentlyReading.progress || 0}%` }
+                        { width: `${currentlyReading.progress || 0}%`, backgroundColor: Colors.primary }
                       ]} 
                     />
                   </View>
@@ -239,17 +240,17 @@ const HomeScreen = () => {
               </View>
             </TouchableOpacity>
           ) : (
-            <View style={styles.emptyStateCard}>
+            <View style={[styles.emptyStateCard, { backgroundColor: Colors.surface }]}>
               <MaterialCommunityIcons name="book-plus" size={48} color={Colors.textSecondary} />
-              <Text style={styles.emptyStateTitle}>Henüz kitap okumuyorsunuz</Text>
-              <Text style={styles.emptyStateText}>
+              <Text style={[styles.emptyStateTitle, { color: Colors.text }]}>Henüz kitap okumuyorsunuz</Text>
+              <Text style={[styles.emptyStateText, { color: Colors.textSecondary }]}>
                 Kütüphanenizden bir kitap seçin ve okumaya başlayın!
               </Text>
               <TouchableOpacity 
-                style={styles.emptyStateButton}
+                style={[styles.emptyStateButton, { backgroundColor: Colors.primary }]}
                 onPress={() => navigation.navigate('Library')}
               >
-                <Text style={styles.emptyStateButtonText}>Kütüphaneye Git</Text>
+                <Text style={[styles.emptyStateButtonText, { color: Colors.surface }]}>Kütüphaneye Git</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -258,7 +259,7 @@ const HomeScreen = () => {
         {/* Partner Updates */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Ortak Güncellemeler</Text>
+            <Text style={[styles.sectionTitle, { color: Colors.text }]}>Ortak Güncellemeler</Text>
             <TouchableOpacity onPress={handleAddPartner}>
               <MaterialCommunityIcons name="plus" size={20} color={Colors.primary} />
             </TouchableOpacity>
@@ -267,7 +268,7 @@ const HomeScreen = () => {
           <View style={styles.updatesContainer}>
             {partnerUpdates.length > 0 ? (
               partnerUpdates.map((update) => (
-                <View key={update.id} style={styles.updateCard}>
+                <View key={update.id} style={[styles.updateCard, { backgroundColor: Colors.surface }]}>
                   <View style={styles.updateContent}>
                     <View style={styles.avatarContainer}>
                       <Image 
@@ -276,11 +277,11 @@ const HomeScreen = () => {
                       />
                     </View>
                     <View style={styles.updateTextContainer}>
-                      <Text style={styles.updateText}>
-                        <Text style={styles.partnerName}>{update.name}</Text>
-                        <Text style={styles.updateActivity}> {update.activity}</Text>
+                      <Text style={[styles.updateText, { color: Colors.text }]}>
+                        <Text style={[styles.partnerName, { color: Colors.text }]}>{update.name}</Text>
+                        <Text style={[styles.updateActivity, { color: Colors.textSecondary }]}> {update.activity}</Text>
                       </Text>
-                      <Text style={styles.updateTime}>{update.time}</Text>
+                      <Text style={[styles.updateTime, { color: Colors.textTertiary }]}>{update.time}</Text>
                     </View>
                   </View>
                   <TouchableOpacity style={styles.heartButton}>
@@ -293,10 +294,10 @@ const HomeScreen = () => {
                 </View>
               ))
             ) : (
-              <View style={styles.emptyUpdatesCard}>
+              <View style={[styles.emptyUpdatesCard, { backgroundColor: Colors.surface }]}>
                 <MaterialCommunityIcons name="heart-plus" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyUpdatesTitle}>Henüz ortak okuma yapmıyorsunuz</Text>
-                <Text style={styles.emptyUpdatesText}>
+                <Text style={[styles.emptyUpdatesTitle, { color: Colors.text }]}>Henüz ortak okuma yapmıyorsunuz</Text>
+                <Text style={[styles.emptyUpdatesText, { color: Colors.textSecondary }]}>
                   Partnerinizi ekleyerek birlikte okuma deneyimi yaşayın!
                 </Text>
               </View>
@@ -306,43 +307,43 @@ const HomeScreen = () => {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
+          <Text style={[styles.sectionTitle, { color: Colors.text }]}>Hızlı İşlemler</Text>
           
           <View style={styles.quickActionsContainer}>
             <TouchableOpacity 
-              style={styles.quickActionCard}
+              style={[styles.quickActionCard, { backgroundColor: Colors.surface }]}
               onPress={() => navigation.navigate('Library')}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: Colors.primary }]}>
                 <MaterialCommunityIcons name="library" size={24} color="white" />
               </View>
-              <Text style={styles.quickActionText}>Kütüphane</Text>
+              <Text style={[styles.quickActionText, { color: Colors.text }]}>Kütüphane</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={styles.quickActionCard}
+              style={[styles.quickActionCard, { backgroundColor: Colors.surface }]}
               onPress={goToReadingTimer}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: Colors.success }]}>
                 <MaterialCommunityIcons name="timer" size={24} color="white" />
               </View>
-              <Text style={styles.quickActionText}>Zamanlayıcı</Text>
+              <Text style={[styles.quickActionText, { color: Colors.text }]}>Zamanlayıcı</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Statistics */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>İstatistikler</Text>
+          <Text style={[styles.sectionTitle, { color: Colors.text }]}>İstatistikler</Text>
           
           <View style={styles.statisticsContainer}>
             {statistics.map((stat, index) => (
-              <View key={stat.id} style={[styles.statCard, index === 1 && styles.middleStatCard]}>
+              <View key={stat.id} style={[styles.statCard, { backgroundColor: Colors.surface }, index === 1 && styles.middleStatCard]}>
                 <View style={[styles.statIcon, { backgroundColor: stat.color }]}>
                   <MaterialCommunityIcons name={stat.icon as any} size={20} color="white" />
                 </View>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
+                <Text style={[styles.statValue, { color: Colors.text }]}>{stat.value}</Text>
+                <Text style={[styles.statLabel, { color: Colors.textSecondary }]}>{stat.label}</Text>
               </View>
             ))}
           </View>
