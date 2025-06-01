@@ -137,12 +137,24 @@ const UserProfile: React.FC<UserProfileProps> = ({
     <View style={styles.container}>
       {/* Main Profile Card */}
       <Surface style={styles.profileCard}>
+        {/* Header with Title - Remove duplicate "Profil" */}
+        <View style={styles.cardHeader}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.cardTitle}>Hesap Bilgileri</Text>
+          </View>
+          {!isGuestUser && (
+            <TouchableOpacity style={styles.settingsIcon} onPress={onNavigateToSettings}>
+              <MaterialCommunityIcons name="cog" size={22} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* User Info Section */}
         <View style={styles.userInfoSection}>
           <View style={styles.avatarContainer}>
             <MaterialCommunityIcons 
               name={isGuestUser ? "account-outline" : "account"} 
-              size={64} 
+              size={72} 
               color={isGuestUser ? Colors.textSecondary : Colors.primary} 
             />
           </View>
@@ -157,7 +169,7 @@ const UserProfile: React.FC<UserProfileProps> = ({
             <View style={styles.userTypeContainer}>
               <MaterialCommunityIcons 
                 name={isGuestUser ? "account-outline" : "shield-check"} 
-                size={16} 
+                size={18} 
                 color={isGuestUser ? Colors.warning : Colors.success} 
               />
               <Text style={[styles.userType, { 
@@ -172,19 +184,25 @@ const UserProfile: React.FC<UserProfileProps> = ({
         {/* User Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <MaterialCommunityIcons name="book-multiple" size={24} color="#1f2d50" />
+            <View style={styles.statIconContainer}>
+              <MaterialCommunityIcons name="book-multiple" size={28} color="#007AFF" />
+            </View>
             <Text style={styles.statValue}>{totalBooks}</Text>
             <Text style={styles.statLabel}>Kitaplar</Text>
           </View>
           
           <View style={styles.statBox}>
-            <MaterialCommunityIcons name="timer-outline" size={24} color="#1f2d50" />
+            <View style={styles.statIconContainer}>
+              <MaterialCommunityIcons name="timer-outline" size={28} color="#FF6B6B" />
+            </View>
             <Text style={styles.statValue}>{totalReadingTime} dk</Text>
             <Text style={styles.statLabel}>Okuma Süresi</Text>
           </View>
           
           <View style={styles.statBox}>
-            <MaterialCommunityIcons name="target" size={24} color="#1f2d50" />
+            <View style={styles.statIconContainer}>
+              <MaterialCommunityIcons name="target" size={28} color="#4ECDC4" />
+            </View>
             <Text style={styles.statValue}>
               {currentUser?.preferences?.readingGoal || 30} dk
             </Text>
@@ -192,7 +210,7 @@ const UserProfile: React.FC<UserProfileProps> = ({
           </View>
         </View>
 
-        {/* Action Buttons */}
+        {/* Compact Action Buttons */}
         <View style={styles.actionsContainer}>
           {isGuestUser ? (
             <>
@@ -202,22 +220,15 @@ const UserProfile: React.FC<UserProfileProps> = ({
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.secondaryButton} onPress={handleGuestLogin}>
-                <MaterialCommunityIcons name="login" size={20} color="#1f2d50" />
+                <MaterialCommunityIcons name="login" size={20} color="#007AFF" />
                 <Text style={styles.secondaryButtonText}>Giriş Yap</Text>
               </TouchableOpacity>
             </>
           ) : (
-            <>
-              <TouchableOpacity style={styles.settingsButton} onPress={onNavigateToSettings}>
-                <MaterialCommunityIcons name="cog" size={20} color="#1f2d50" />
-                <Text style={styles.settingsButtonText}>Ayarlar</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <MaterialCommunityIcons name="logout" size={20} color="#fff" />
-                <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity style={styles.compactLogoutButton} onPress={handleLogout}>
+              <MaterialCommunityIcons name="logout" size={16} color="#FF3B30" />
+              <Text style={styles.compactLogoutText}>Çıkış Yap</Text>
+            </TouchableOpacity>
           )}
         </View>
       </Surface>
@@ -289,62 +300,89 @@ const UserProfile: React.FC<UserProfileProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: Spacing.md,
+    padding: Spacing.lg,
+    backgroundColor: '#FAFAFA',
   },
   profileCard: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-    shadowColor: Colors.shadow,
+    borderRadius: 20,
+    padding: Spacing.xxl,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: Spacing.lg,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: Spacing.xxl,
   },
   loadingText: {
     textAlign: 'center',
     color: Colors.textSecondary,
     fontSize: FontSizes.md,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xxl,
+  },
+  headerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: FontSizes.xxl,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  settingsIcon: {
+    padding: Spacing.md,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 20,
+    elevation: 2,
+  },
   userInfoSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    marginBottom: Spacing.xxl,
+    paddingBottom: Spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#F5F5F5',
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.backgroundGray,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.md,
+    marginRight: Spacing.xl,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   userInfo: {
     flex: 1,
   },
   displayName: {
-    fontSize: FontSizes.lg,
-    fontWeight: '600',
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
     color: Colors.text,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   email: {
-    fontSize: FontSizes.sm,
+    fontSize: FontSizes.md,
     color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.md,
   },
   userTypeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   userType: {
     fontSize: FontSizes.sm,
@@ -353,45 +391,56 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    marginBottom: Spacing.xxl,
+    paddingBottom: Spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#F5F5F5',
   },
   statBox: {
     alignItems: 'center',
     flex: 1,
   },
+  statIconContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 25,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
   statValue: {
-    fontSize: FontSizes.lg,
-    fontWeight: 'bold',
-    color: '#1f2d50',
-    marginTop: Spacing.xs,
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    color: '#2C3E50',
     marginBottom: Spacing.xs,
   },
   statLabel: {
-    fontSize: FontSizes.xs,
+    fontSize: FontSizes.sm,
     color: Colors.textSecondary,
+    fontWeight: '500',
   },
   actionsContainer: {
-    gap: Spacing.md,
+    gap: Spacing.lg,
   },
   primaryButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: '#007AFF',
+    borderRadius: 16,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.shadow,
+    shadowColor: '#007AFF',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   primaryButtonText: {
     color: Colors.surface,
@@ -400,90 +449,62 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   secondaryButton: {
-    backgroundColor: '#e6ebff',
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 16,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#d1d9ff',
+    borderWidth: 2,
+    borderColor: '#E3F2FD',
   },
   secondaryButtonText: {
-    color: '#1f2d50',
+    color: '#007AFF',
     fontSize: FontSizes.md,
     fontWeight: '600',
     marginLeft: Spacing.sm,
   },
-  settingsButton: {
-    backgroundColor: '#e6ebff',
-    borderRadius: BorderRadius.md,
+  compactLogoutButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 12,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: '#FFE5E5',
+    alignSelf: 'flex-start',
   },
-  settingsButtonText: {
-    color: '#1f2d50',
-    fontSize: FontSizes.md,
+  compactLogoutText: {
+    color: '#FF3B30',
+    fontSize: FontSizes.sm,
     fontWeight: '600',
-    marginLeft: Spacing.sm,
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  logoutButtonText: {
-    color: '#fff',
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    marginLeft: Spacing.sm,
+    marginLeft: Spacing.xs,
   },
   additionalCard: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    shadowColor: Colors.shadow,
+    borderRadius: 16,
+    padding: Spacing.xl,
+    marginBottom: Spacing.lg,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   progressSection: {
     marginBottom: Spacing.sm,
   },
   progressTitle: {
-    fontSize: FontSizes.md,
+    fontSize: FontSizes.lg,
     fontWeight: '600',
     color: Colors.text,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   progressStats: {
     flexDirection: 'row',
@@ -494,27 +515,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   progressValue: {
-    fontSize: FontSizes.lg,
-    fontWeight: 'bold',
-    color: '#1f2d50',
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    color: '#2C3E50',
   },
   progressLabel: {
-    fontSize: FontSizes.xs,
+    fontSize: FontSizes.sm,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
+    fontWeight: '500',
   },
   infoCard: {
-    backgroundColor: '#f0f4ff',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    shadowColor: Colors.shadow,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 16,
+    padding: Spacing.xl,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   infoContent: {
     flexDirection: 'row',
@@ -522,18 +544,18 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-    marginLeft: Spacing.md,
+    marginLeft: Spacing.lg,
   },
   infoTitle: {
-    fontSize: FontSizes.md,
+    fontSize: FontSizes.lg,
     fontWeight: '600',
     color: Colors.text,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   infoDescription: {
-    fontSize: FontSizes.sm,
+    fontSize: FontSizes.md,
     color: Colors.textSecondary,
-    lineHeight: FontSizes.sm * 1.4,
+    lineHeight: FontSizes.md * 1.5,
   },
 });
 

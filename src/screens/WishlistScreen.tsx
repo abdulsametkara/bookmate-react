@@ -81,6 +81,9 @@ const WishlistScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
 
+  // Arama input referansı
+  const searchInputRef = React.useRef<TextInput>(null);
+
   // Animation states
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'progress' | 'status' | 'completion' | 'error' | 'warning' | 'info' | 'loading' | 'delete' | 'favorite' | 'menu' | 'action'>('info');
@@ -475,26 +478,22 @@ const WishlistScreen = () => {
   return (
     <>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>İstek Listesi</Text>
-        </View>
-
-        {/* Search Bar */}
+        {/* Modern Arama Kutusunu Üstte */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <MaterialCommunityIcons name="magnify" size={20} color="#999999" />
+            <MaterialCommunityIcons name="magnify" size={20} color="#666666" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Bir kitap ara..."
-              placeholderTextColor="#A0A0A0"
+              placeholder="Hangi kitabı arıyorsunuz?"
+              placeholderTextColor="#999999"
               value={searchQuery}
               onChangeText={setSearchQuery}
               onSubmitEditing={() => searchBooks(searchQuery)}
               returnKeyType="search"
+              ref={searchInputRef}
             />
             {isSearching && (
-              <ActivityIndicator size="small" color={Colors.primary} />
+              <ActivityIndicator size="small" color={Colors.primary} style={styles.searchLoader} />
             )}
           </View>
         </View>
@@ -518,14 +517,27 @@ const WishlistScreen = () => {
                 refreshing={isLoading}
               />
             ) : (
-              <View style={styles.emptyState}>
-                <View style={styles.emptyIconContainer}>
-                  <MaterialCommunityIcons name="heart-outline" size={48} color="#BBBBBB" />
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconWrapper}>
+                  <MaterialCommunityIcons name="heart-outline" size={80} color="#E8EAED" />
                 </View>
-                <Text style={styles.emptyStateTitle}>İstek listeniz boş</Text>
-                <Text style={styles.emptyStateSubtitle}>
-                  Okumak istediğiniz kitapları arayarak istek listenize ekleyin
+                <Text style={styles.emptyTitle}>İstek listeniz henüz boş</Text>
+                <Text style={styles.emptySubtitle}>
+                  Beğendiğiniz kitapları arayarak{'\n'}istek listenize ekleyebilirsiniz
                 </Text>
+                
+                {/* Modern Arama Butonu */}
+                <TouchableOpacity 
+                  style={styles.searchButton}
+                  onPress={() => {
+                    // Arama kutusuna focus yap ve yukarı scroll et
+                    searchInputRef.current?.focus();
+                    setSearchQuery('');
+                  }}
+                >
+                  <MaterialCommunityIcons name="magnify" size={18} color="#ffffff" style={styles.buttonIcon} />
+                  <Text style={styles.searchButtonText}>Kitap Ara</Text>
+                </TouchableOpacity>
               </View>
             )}
           </>
@@ -578,60 +590,58 @@ const WishlistScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  title: {
-    fontSize: FontSizes.xl,
-    fontWeight: 'bold',
-    color: Colors.text,
+    backgroundColor: '#FAFAFA',
   },
   searchContainer: {
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    borderRadius: 16,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  searchIcon: {
+    marginRight: Spacing.md,
   },
   searchInput: {
     flex: 1,
-    marginLeft: Spacing.sm,
     fontSize: FontSizes.md,
     color: Colors.text,
+    fontWeight: '400',
+  },
+  searchLoader: {
+    marginLeft: Spacing.sm,
   },
   searchResultsContainer: {
     width: '100%',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    elevation: 8,
+    borderRadius: BorderRadius.lg,
+    elevation: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     maxHeight: '80%',
   },
   searchResultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.md,
+    padding: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#F5F5F5',
   },
   searchResultsTitle: {
     fontSize: FontSizes.lg,
@@ -639,19 +649,20 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   searchResultsList: {
-    padding: Spacing.sm,
+    padding: Spacing.md,
   },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
     marginVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface,
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 1,
+    shadowRadius: 2,
   },
   booksList: {
     padding: Spacing.md,
@@ -659,14 +670,15 @@ const styles = StyleSheet.create({
   wishlistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    marginVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-    elevation: 2,
+    padding: Spacing.lg,
+    marginVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.surface,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
   },
   bookCover: {
     width: 60,
@@ -705,11 +717,12 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: Colors.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 2,
   },
   menuButton: {
     padding: Spacing.sm,
@@ -724,27 +737,62 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     color: Colors.textSecondary,
   },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
+    marginTop: -60,
   },
-  emptyIconContainer: {
-    marginBottom: Spacing.lg,
+  emptyIconWrapper: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
-  emptyStateTitle: {
-    fontSize: FontSizes.lg,
-    fontWeight: '600',
+  emptyTitle: {
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
     color: Colors.text,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
     textAlign: 'center',
   },
-  emptyStateSubtitle: {
+  emptySubtitle: {
     fontSize: FontSizes.md,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
+    marginBottom: Spacing.xxl,
+  },
+  searchButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  buttonIcon: {
+    marginRight: Spacing.sm,
+  },
+  searchButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   searchResultsOverlay: {
     position: 'absolute',

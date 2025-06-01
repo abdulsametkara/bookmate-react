@@ -10,7 +10,8 @@ import {
   Modal,
   FlatList,
   Image,
-  AppState
+  AppState,
+  StatusBar
 } from 'react-native';
 import { Surface } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -451,122 +452,117 @@ const ReadingTimerScreen = () => {
   const todayTime = formatTime(todayMinutes + sessionSeconds);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerSafeArea}>
-        <Surface style={styles.header}>
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#007AFF" barStyle="light-content" />
+      
+      {/* Modern Gradient Header */}
+      <SafeAreaView style={styles.headerSafeArea}>
+        <View style={styles.modernHeader}>
           <TouchableOpacity 
-            style={styles.backButton}
+            style={styles.modernBackButton}
             onPress={() => navigation.goBack()}
           >
-            <MaterialCommunityIcons name="arrow-left" size={24} color={Colors.primary} />
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Okuma Zamanlayıcı</Text>
+          <Text style={styles.modernHeaderTitle}>Okuma Zamanlayıcı</Text>
           <TouchableOpacity 
-            style={styles.statsButton}
+            style={styles.modernStatsButton}
             onPress={goToStats}
           >
-            <MaterialCommunityIcons name="chart-bar" size={24} color={Colors.primary} />
+            <MaterialCommunityIcons name="chart-line" size={24} color="#fff" />
           </TouchableOpacity>
-        </Surface>
-      </View>
+        </View>
+      </SafeAreaView>
 
       <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.modernScrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Book Selection Card */}
-        <TouchableOpacity onPress={selectBook}>
-          <Surface style={styles.bookSelectionCard}>
+        {/* Book Selection Card - Modern */}
+        <TouchableOpacity onPress={selectBook} style={styles.modernBookCard}>
+          <View style={styles.modernBookCardContent}>
             {selectedBook ? (
-              <View style={styles.selectedBookContainer}>
-                <View style={styles.selectedBookCover}>
-                  <Image 
-                    source={{ uri: selectedBook.coverURL }}
-                    style={styles.selectedBookImage}
-                  />
-                </View>
-                <View style={styles.selectedBookInfo}>
-                  <Text style={styles.selectedBookTitle} numberOfLines={2}>
-                    {selectedBook.title}
-                  </Text>
-                  <Text style={styles.selectedBookAuthor}>
-                    {selectedBook.author}
-                  </Text>
-                  <Text style={styles.changeBookHint}>
-                    Değiştirmek için dokunun
-                  </Text>
-                </View>
-              </View>
-            ) : (
               <>
-                <Text style={styles.bookSelectionTitle}>Bir kitap seçin</Text>
-                <Text style={styles.bookSelectionSubtitle}>
-                  Kütüphanenizden bir kitap seçmek için dokunun
-                </Text>
+                <View style={styles.modernBookInfo}>
+                  <View style={styles.modernBookCoverContainer}>
+                    <Image 
+                      source={{ uri: selectedBook.coverURL || 'https://via.placeholder.com/80x120?text=Kapak+Yok' }}
+                      style={styles.modernBookCoverImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                  <View style={styles.modernBookDetails}>
+                    <Text style={styles.modernBookTitle} numberOfLines={2}>
+                      {selectedBook.title}
+                    </Text>
+                    <Text style={styles.modernBookAuthor}>
+                      {selectedBook.author}
+                    </Text>
+                    <View style={styles.modernBookProgress}>
+                      <MaterialCommunityIcons name="bookmark" size={16} color="#FF6B6B" />
+                      <Text style={styles.modernBookProgressText}>
+                        Sayfa {selectedBook.currentPage} / {selectedBook.pageCount}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
               </>
+            ) : (
+              <View style={styles.modernBookEmptyState}>
+                <View style={styles.modernBookEmptyIcon}>
+                  <MaterialCommunityIcons name="book-plus" size={48} color="#007AFF" />
+                </View>
+                <Text style={styles.modernBookEmptyTitle}>Kitap Seçin</Text>
+                <Text style={styles.modernBookEmptySubtitle}>
+                  Okuma seansını başlatmak için bir kitap seçin
+                </Text>
+              </View>
             )}
-          </Surface>
+          </View>
         </TouchableOpacity>
 
-        {/* Timer Display Card */}
-        <Surface style={styles.timerCard}>
-          <View style={styles.timerDisplay}>
-            <View style={styles.timeUnit}>
-              <Text style={styles.timeNumber}>{currentTime.hours}</Text>
-              <Text style={styles.timeLabel}>Saat</Text>
-            </View>
-            
-            <View style={styles.timeSeparator}>
-              <Text style={styles.separatorText}>:</Text>
-            </View>
-            
-            <View style={styles.timeUnit}>
-              <Text style={styles.timeNumber}>{currentTime.minutes}</Text>
-              <Text style={styles.timeLabel}>Dakika</Text>
-            </View>
-            
-            <View style={styles.timeSeparator}>
-              <Text style={styles.separatorText}>:</Text>
-            </View>
-            
-            <View style={styles.timeUnit}>
-              <Text style={styles.timeNumber}>{currentTime.seconds}</Text>
-              <Text style={styles.timeLabel}>Saniye</Text>
+        {/* Modern Timer Display */}
+        <View style={styles.modernTimerCard}>
+          <View style={styles.modernTimerHeader}>
+            <Text style={styles.modernTimerTitle}>Okuma Süresi</Text>
+            <View style={[styles.modernStatusBadge, {
+              backgroundColor: !isRunning ? '#F3F4F6' : isPaused ? '#FFF3CD' : '#D1F7C4'
+            }]}>
+              <View style={[styles.modernStatusDot, {
+                backgroundColor: !isRunning ? '#9CA3AF' : isPaused ? '#FFB800' : '#4CAF50'
+              }]} />
+              <Text style={[styles.modernStatusText, {
+                color: !isRunning ? '#6B7280' : isPaused ? '#D97706' : '#16A34A'
+              }]}>
+                {!isRunning ? 'Beklemede' : isPaused ? 'Duraklatıldı' : 'Okuma devam ediyor'}
+              </Text>
             </View>
           </View>
 
-          {/* Status */}
-          <View style={styles.statusSection}>
-            <Text style={styles.statusLabel}>
-              {!isRunning ? 'Okuma başlatılmadı' : 
-               isPaused ? 'Okuma duraklatıldı' : 'Okuma devam ediyor'}
-            </Text>
-            {isRunning && (
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { 
-                  backgroundColor: isPaused ? '#FF9500' : '#34C759',
-                  width: isPaused ? '50%' : '100%'
-                }]} />
-              </View>
+          {/* Main Timer Display */}
+          <View style={styles.mainTimerDisplay}>
+            <Text style={styles.mainTimerTime}>{currentTime.formatted}</Text>
+            <Text style={styles.mainTimerLabel}>Bu Oturum</Text>
+          </View>
+
+          {/* Modern Control Buttons */}
+          <View style={styles.modernControlsContainer}>
+            {sessionSeconds > 0 && (
+              <TouchableOpacity 
+                style={styles.modernSecondaryButton}
+                onPress={stopTimer}
+              >
+                <MaterialCommunityIcons name="stop" size={20} color="#FF6B6B" />
+                <Text style={styles.modernSecondaryButtonText}>Durdur & Kaydet</Text>
+              </TouchableOpacity>
             )}
-          </View>
-
-          {/* Control Buttons */}
-          <View style={styles.controlsContainer}>
-            <TouchableOpacity 
-              style={[styles.controlButton, styles.stopButton]}
-              onPress={stopTimer}
-              disabled={sessionSeconds === 0}
-            >
-              <MaterialCommunityIcons name="stop" size={18} color="#666" />
-              <Text style={styles.stopButtonText}>Kaydet & Durdur</Text>
-            </TouchableOpacity>
             
             <TouchableOpacity 
-              style={[styles.controlButton, styles.mainButton, {
-                backgroundColor: !isRunning ? '#007AFF' : isPaused ? '#007AFF' : '#FF9500'
+              style={[styles.modernPrimaryButton, {
+                backgroundColor: !isRunning ? '#007AFF' : isPaused ? '#4CAF50' : '#FF9500',
+                flex: sessionSeconds > 0 ? 1 : 1
               }]}
               onPress={() => {
                 if (!isRunning) {
@@ -577,53 +573,68 @@ const ReadingTimerScreen = () => {
                   pauseTimer();
                 }
               }}
+              disabled={!selectedBook}
             >
               <MaterialCommunityIcons 
                 name={!isRunning ? 'play' : isPaused ? 'play' : 'pause'} 
-                size={18} 
+                size={24} 
                 color="white" 
               />
-              <Text style={styles.mainButtonText}>
+              <Text style={styles.modernPrimaryButtonText}>
                 {!isRunning ? 'Başla' : isPaused ? 'Devam Et' : 'Duraklat'}
               </Text>
             </TouchableOpacity>
           </View>
-        </Surface>
+        </View>
 
-        {/* Statistics Card */}
-        <Surface style={styles.statsCard}>
-          <Text style={styles.sectionTitle}>Okuma İstatistikleri</Text>
+        {/* Modern Statistics Cards */}
+        <View style={styles.modernStatsContainer}>
+          <Text style={styles.modernSectionTitle}>📊 Okuma İstatistikleri</Text>
           
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Bu Oturum</Text>
-              <Text style={styles.statValue}>{currentTime.formatted}</Text>
+          <View style={styles.modernStatsGrid}>
+            <View style={[styles.modernStatCard, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
+              <View style={styles.modernStatIcon}>
+                <MaterialCommunityIcons name="calendar-today" size={24} color="#4CAF50" />
+              </View>
+              <Text style={styles.modernStatValue}>{todayTime.formatted}</Text>
+              <Text style={styles.modernStatLabel}>Bugün Toplam</Text>
             </View>
-            
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Bugün Toplam</Text>
-              <Text style={styles.statValue}>{todayTime.formatted}</Text>
+
+            <View style={[styles.modernStatCard, { backgroundColor: 'rgba(255, 107, 107, 0.1)' }]}>
+              <View style={styles.modernStatIcon}>
+                <MaterialCommunityIcons name="clock-outline" size={24} color="#FF6B6B" />
+              </View>
+              <Text style={styles.modernStatValue}>
+                {readingStats ? formatTime(readingStats.totalSecondsRead).formatted : '00:00:00'}
+              </Text>
+              <Text style={styles.modernStatLabel}>Genel Toplam</Text>
             </View>
           </View>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Genel Toplam</Text>
-              <Text style={styles.statValue}>
-                {readingStats ? formatTime(readingStats.totalSecondsRead).formatted : '00:00:00'}
-              </Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Ortalama/Gün</Text>
-              <Text style={styles.statValue}>
+          <View style={styles.modernStatsGrid}>
+            <View style={[styles.modernStatCard, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+              <View style={styles.modernStatIcon}>
+                <MaterialCommunityIcons name="trending-up" size={24} color="#8B5CF6" />
+              </View>
+              <Text style={styles.modernStatValue}>
                 {readingStats && readingStats.totalSessions > 0 
                   ? formatTime(readingStats.averageSessionDuration).formatted 
                   : '00:00:00'}
               </Text>
+              <Text style={styles.modernStatLabel}>Ortalama/Gün</Text>
+            </View>
+
+            <View style={[styles.modernStatCard, { backgroundColor: 'rgba(255, 184, 0, 0.1)' }]}>
+              <View style={styles.modernStatIcon}>
+                <MaterialCommunityIcons name="fire" size={24} color="#FFB800" />
+              </View>
+              <Text style={styles.modernStatValue}>
+                {readingStats?.currentStreak || 0}
+              </Text>
+              <Text style={styles.modernStatLabel}>Gün Streak</Text>
             </View>
           </View>
-        </Surface>
+        </View>
       </ScrollView>
 
       {/* Book Selection Modal */}
@@ -661,59 +672,56 @@ const ReadingTimerScreen = () => {
         onHide={hideToast}
         action={toast.action}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#007AFF',
   },
-  headerSafeArea: {
-    backgroundColor: Colors.surface,
-  },
-  header: {
+  modernHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: Spacing.lg,
+    backgroundColor: '#007AFF',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
   },
-  backButton: {
+  modernBackButton: {
     padding: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.backgroundGray,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
   },
-  headerTitle: {
+  modernHeaderTitle: {
     fontSize: FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.text,
+    fontWeight: '700',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
-  statsButton: {
+  modernStatsButton: {
     padding: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.backgroundGray,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
   },
-  scrollContent: {
+  modernScrollContent: {
     padding: Spacing.lg,
     paddingBottom: Spacing.xxl,
   },
-  bookSelectionCard: {
+  modernBookCard: {
     backgroundColor: Colors.primaryLight,
     marginBottom: Spacing.lg,
     padding: Spacing.xl,
@@ -730,19 +738,74 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  bookSelectionTitle: {
-    fontSize: FontSizes.lg,
+  modernBookCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modernBookInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modernBookCoverContainer: {
+    width: 80,
+    height: 120,
+    borderRadius: BorderRadius.md,
+    marginRight: Spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernBookCoverImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: BorderRadius.md,
+  },
+  modernBookDetails: {
+    flex: 1,
+  },
+  modernBookTitle: {
+    fontSize: FontSizes.md,
     fontWeight: '600',
     color: Colors.text,
     marginBottom: Spacing.sm,
   },
-  bookSelectionSubtitle: {
+  modernBookAuthor: {
+    fontSize: FontSizes.sm,
+    color: Colors.textSecondary,
+  },
+  modernBookProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modernBookProgressText: {
+    fontSize: FontSizes.sm,
+    color: Colors.textSecondary,
+  },
+  modernBookEmptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernBookEmptyIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.backgroundGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernBookEmptyTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '600',
+    color: Colors.text,
+    marginTop: Spacing.sm,
+  },
+  modernBookEmptySubtitle: {
     fontSize: FontSizes.md,
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: FontSizes.md * 1.4,
   },
-  timerCard: {
+  modernTimerCard: {
     backgroundColor: Colors.surface,
     marginBottom: Spacing.lg,
     padding: Spacing.xl,
@@ -758,69 +821,65 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  timerDisplay: {
+  modernTimerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: Spacing.xl,
   },
-  timeUnit: {
-    backgroundColor: Colors.backgroundGray,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  timeNumber: {
-    fontSize: FontSizes.xxxl,
-    fontWeight: '700',
+  modernTimerTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '600',
     color: Colors.text,
-    marginBottom: Spacing.xs,
   },
-  timeLabel: {
-    fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
+  modernStatusBadge: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.backgroundGray,
+  },
+  modernStatusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: BorderRadius.full,
+    marginRight: Spacing.sm,
+  },
+  modernStatusText: {
+    fontSize: FontSizes.md,
     fontWeight: '500',
+    color: Colors.textSecondary,
   },
-  timeSeparator: {
-    width: 20,
+  mainTimerDisplay: {
+    backgroundColor: '#007AFF',
+    borderRadius: 20,
+    padding: Spacing.xl,
     alignItems: 'center',
-  },
-  separatorText: {
-    fontSize: FontSizes.md,
-    fontWeight: '500',
-    color: Colors.textSecondary,
-  },
-  statusSection: {
+    justifyContent: 'center',
     marginBottom: Spacing.xl,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  statusLabel: {
-    fontSize: FontSizes.md,
-    color: Colors.textSecondary,
+  mainTimerTime: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: Spacing.xs,
     textAlign: 'center',
-    marginBottom: Spacing.md,
-    fontWeight: '500',
   },
-  progressBar: {
-    height: 8,
-    backgroundColor: Colors.progressBackground,
-    borderRadius: BorderRadius.sm,
-    overflow: 'hidden',
+  mainTimerLabel: {
+    fontSize: FontSizes.md,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+    textAlign: 'center',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.sm,
-  },
-  controlsContainer: {
+  modernControlsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Spacing.md,
   },
-  controlButton: {
+  modernSecondaryButton: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     borderRadius: BorderRadius.md,
@@ -837,29 +896,36 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  stopButton: {
-    backgroundColor: Colors.backgroundGray,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  stopButtonText: {
+  modernSecondaryButtonText: {
     fontSize: FontSizes.md,
     fontWeight: '600',
     color: '#666666',
     marginLeft: Spacing.xs,
   },
-  mainButton: {
-    backgroundColor: Colors.primary,
-    marginLeft: Spacing.md,
+  modernPrimaryButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.md,
     flex: 2,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: Colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  mainButtonText: {
+  modernPrimaryButtonText: {
     fontSize: FontSizes.md,
     fontWeight: '600',
     color: Colors.surface,
     marginLeft: Spacing.xs,
   },
-  statsCard: {
+  modernStatsContainer: {
     backgroundColor: Colors.surface,
     padding: Spacing.xl,
     borderRadius: BorderRadius.lg,
@@ -874,18 +940,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  sectionTitle: {
+  modernSectionTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '600',
     color: Colors.text,
     marginBottom: Spacing.lg,
   },
-  statsGrid: {
+  modernStatsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: Spacing.md,
   },
-  statItem: {
+  modernStatCard: {
     backgroundColor: Colors.backgroundGray,
     padding: Spacing.lg,
     borderRadius: BorderRadius.md,
@@ -894,16 +960,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  statLabel: {
+  modernStatIcon: {
+    width: 24,
+    height: 24,
+    marginBottom: Spacing.sm,
+  },
+  modernStatValue: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  modernStatLabel: {
     fontSize: FontSizes.sm,
     color: Colors.textSecondary,
     marginBottom: Spacing.sm,
     fontWeight: '500',
   },
-  statValue: {
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
     fontSize: FontSizes.lg,
-    fontWeight: '700',
+    fontWeight: '600',
     color: Colors.text,
+  },
+  modalCloseButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.backgroundGray,
+  },
+  booksList: {
+    padding: Spacing.md,
   },
   bookSelectionItem: {
     flexDirection: 'row',
@@ -939,69 +1036,14 @@ const styles = StyleSheet.create({
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: Spacing.xs,
   },
   statusText: {
     fontSize: FontSizes.sm,
     fontWeight: '500',
   },
-  selectedBookContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  selectedBookCover: {
-    width: 80,
-    height: 120,
-    borderRadius: BorderRadius.md,
-    marginRight: Spacing.md,
-  },
-  selectedBookImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: BorderRadius.md,
-  },
-  selectedBookInfo: {
-    flex: 1,
-  },
-  selectedBookTitle: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: Spacing.sm,
-  },
-  selectedBookAuthor: {
-    fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
-  },
-  changeBookHint: {
-    fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  modalTitle: {
-    fontSize: FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  modalCloseButton: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.backgroundGray,
-  },
-  booksList: {
-    padding: Spacing.md,
+  headerSafeArea: {
+    backgroundColor: '#007AFF',
   },
 });
 

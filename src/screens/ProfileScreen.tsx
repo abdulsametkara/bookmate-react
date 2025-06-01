@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   StyleSheet, 
   View,
-  SafeAreaView 
+  SafeAreaView
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -18,11 +18,6 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Profil</Text>
-      </View>
-
       {/* User Profile Component */}
       <UserProfile 
         onNavigateToSettings={handleNavigateToSettings}
@@ -34,18 +29,7 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  title: {
-    fontSize: FontSizes.xl,
-    fontWeight: '600',
-    color: Colors.text,
+    backgroundColor: '#FAFAFA', // Modern arka plan
   },
 });
 

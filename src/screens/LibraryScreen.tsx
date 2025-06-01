@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, FlatList, TouchableOpacity, SafeAreaView, ScrollView, Image, Platform, Alert } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, SafeAreaView, ScrollView, Image, Platform, Alert, StatusBar } from 'react-native';
 import { 
   Text, 
   Card, 
@@ -27,12 +27,12 @@ const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   
-  // iOS uyumlu renk kodları
+  // Modern renk kodları
   const getStatusColor = (status: BookStatus) => {
     switch(status) {
-      case BookStatus.READING: return '#007AFF'; // iOS mavi
-      case BookStatus.COMPLETED: return '#34C759'; // iOS yeşil
-      case BookStatus.TO_READ: return '#8E8E93'; // iOS gri
+      case BookStatus.READING: return '#007AFF'; // Modern mavi
+      case BookStatus.COMPLETED: return '#4CAF50'; // Modern yeşil
+      case BookStatus.TO_READ: return '#FF6B6B'; // Modern kırmızı/pembe
       default: return '#007AFF';
     }
   };
@@ -46,27 +46,36 @@ const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void
     }
   };
 
-  // iOS tarzı kart tasarımı
+  const getStatusIcon = (status: BookStatus) => {
+    switch(status) {
+      case BookStatus.READING: return 'book-open-page-variant';
+      case BookStatus.COMPLETED: return 'check-circle';
+      case BookStatus.TO_READ: return 'bookmark-outline';
+      default: return 'book';
+    }
+  };
+
+  // Modern tasarım
   return (
     <TouchableOpacity 
       onPress={onPress} 
       style={[
-        styles.bookItem,
-        viewMode === 'grid' ? styles.bookItemGrid : styles.bookItemList
+        styles.modernBookItem,
+        viewMode === 'grid' ? styles.modernBookItemGrid : styles.modernBookItemList
       ]}
     >
       <Surface style={[
-        styles.bookCard,
-        viewMode === 'grid' ? styles.bookCardGrid : styles.bookCardList
+        styles.modernBookCard,
+        viewMode === 'grid' ? styles.modernBookCardGrid : styles.modernBookCardList
       ]}>
         <View style={[
-          styles.bookCoverContainer,
-          viewMode === 'grid' ? styles.bookCoverContainerGrid : styles.bookCoverContainerList
+          styles.modernBookCoverContainer,
+          viewMode === 'grid' ? styles.modernBookCoverContainerGrid : styles.modernBookCoverContainerList
         ]}>
           {!imageError ? (
             <Image 
               source={{ uri: book.coverURL }}
-              style={styles.bookCover}
+              style={styles.modernBookCover}
               resizeMode="cover"
               onLoadStart={() => {
                 setImageLoading(true);
@@ -79,81 +88,87 @@ const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void
               }}
             />
           ) : (
-            <View style={styles.noCoverPlaceholder}>
+            <View style={styles.modernNoCoverPlaceholder}>
               <MaterialCommunityIcons name="book-variant" size={viewMode === 'grid' ? 40 : 30} color="#CCCCCC" />
-              <Text style={styles.noCoverText} numberOfLines={1}>{book.title}</Text>
+              <Text style={styles.modernNoCoverText} numberOfLines={2}>{book.title}</Text>
             </View>
           )}
           
           {imageLoading && (
-            <View style={styles.imageLoadingContainer}>
+            <View style={styles.modernImageLoadingContainer}>
               <ActivityIndicator animating={true} color={getStatusColor(book.status)} size={24} />
             </View>
           )}
           
-          {/* Durum göstergesi */}
+          {/* Modern durum göstergesi */}
           <View style={[
-            styles.statusBadge, 
+            styles.modernStatusBadge, 
             { backgroundColor: getStatusColor(book.status) }
           ]}>
-            <Text style={styles.statusBadgeText}>
-              {getStatusText(book.status)}
-            </Text>
+            <MaterialCommunityIcons 
+              name={getStatusIcon(book.status)} 
+              size={12} 
+              color="#fff" 
+            />
           </View>
         </View>
         
-        <View style={styles.bookContent}>
-          <View style={styles.bookTitleContainer}>
+        <View style={styles.modernBookContent}>
+          <View style={styles.modernBookTitleContainer}>
             <Text 
-              numberOfLines={viewMode === 'grid' ? 1 : 2} 
-              style={styles.bookTitle}
+              numberOfLines={viewMode === 'grid' ? 2 : 2} 
+              style={styles.modernBookTitle}
             >
               {book.title}
             </Text>
             <Text 
               numberOfLines={1} 
-              style={styles.bookAuthor}
+              style={styles.modernBookAuthor}
             >
               {book.author}
             </Text>
           </View>
           
-          {book.status === BookStatus.READING && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBarContainer}>
-                <View style={styles.progressBackground} />
+          {(book.status === BookStatus.READING || (book.status as any) === 'READING') && (
+            <View style={styles.modernProgressContainer}>
+              <View style={styles.modernProgressBarContainer}>
+                <View style={styles.modernProgressBackground} />
                 <View 
                   style={[
-                    styles.progressFill, 
+                    styles.modernProgressFill, 
                     { 
-                      width: `${book.progress}%`,
+                      width: `${Math.min(100, Math.max(0, (book.currentPage / book.pageCount) * 100))}%`,
                       backgroundColor: getStatusColor(book.status)
                     }
                   ]} 
                 />
               </View>
-              <Text style={styles.progressText}>
-                <Text style={[styles.progressValue, { color: getStatusColor(book.status) }]}>
-                  {book.currentPage}
+              <View style={styles.modernProgressInfo}>
+                <Text style={styles.modernProgressText}>
+                  <Text style={[styles.modernProgressValue, { color: getStatusColor(book.status) }]}>
+                    {book.currentPage || 0}
+                  </Text>
+                  <Text style={styles.modernProgressTotal}>/{book.pageCount || 0}</Text>
                 </Text>
-                <Text style={styles.progressTotal}>/{book.pageCount}</Text>
-              </Text>
+                <Text style={[styles.modernProgressPercent, { color: getStatusColor(book.status) }]}>
+                  %{Math.round(Math.min(100, Math.max(0, (book.currentPage / book.pageCount) * 100)) || 0)}
+                </Text>
+              </View>
             </View>
           )}
           
           {viewMode === 'list' && (
-            <View style={styles.bookActions}>
+            <View style={styles.modernBookActions}>
               <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: getStatusColor(book.status) }]}
+                style={[styles.modernActionButton, { backgroundColor: getStatusColor(book.status) }]}
                 onPress={onPress}
               >
                 <MaterialCommunityIcons 
-                  name={book.status === BookStatus.READING ? 'book-open-page-variant' : 
-                        book.status === BookStatus.COMPLETED ? 'check' : 'bookmark-outline'} 
+                  name={getStatusIcon(book.status)} 
                   size={16} 
                   color="#FFFFFF" 
                 />
-                <Text style={styles.actionButtonText}>
+                <Text style={styles.modernActionButtonText}>
                   {book.status === BookStatus.READING ? 'Devam Et' : 
                    book.status === BookStatus.COMPLETED ? 'Tekrar Oku' : 'Okumaya Başla'}
                 </Text>
@@ -174,161 +189,258 @@ const LibraryScreen = () => {
   const [viewMode, setViewMode] = useState('grid'); // grid or list
   const [refreshKey, setRefreshKey] = useState(0); // Add this to force refresh
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
+  const [isLoadingBooks, setIsLoadingBooks] = useState(false); // Yeni loading state
 
   const currentUserId = useSelector((state: RootState) => state.books.currentUserId);
 
   // Backend API'den kullanıcının kitaplarını yükle
-  const loadBooksFromAPI = async () => {
-    if (!currentUserId) return;
+  const loadBooksFromAPI = async (showLoading = false, force = false) => {
+    if (!currentUserId) {
+      console.log('❌ No current user ID, skipping API call');
+      return;
+    }
+
+    // Zaten yükleniyor ise skip et
+    if (isLoadingBooks && !force) {
+      console.log('⏳ Books already loading, skipping...');
+      return;
+    }
+
+    setIsLoadingBooks(true);
     
-    setIsLoading(true);
+    if (showLoading) {
+      setIsLoading(true);
+    }
+
     try {
-      console.log('📚 Backend API\'den kitaplar yükleniyor...');
-      const result = await APIService.getUserBooks();
+      console.log('🔄 Loading books from API...');
       
+      // Check if we have auth token
+      const token = await AsyncStorage.getItem('bookmate_auth_token');
+      console.log('🔑 Auth token status:', token ? 'Present' : 'Missing');
+      
+      if (!token) {
+        console.log('❌ No auth token found, books will not be synced with backend');
+        displayToast('warning', '⚠️ Çevrimdışı modda çalışıyorsunuz');
+        return;
+      }
+
+      const result = await APIService.getUserBooks();
+      console.log('📚 API result status:', result.success ? 'Success' : 'Failed');
+
       if (result.success && result.books) {
-        // Backend UserBook formatını uygulama Book formatına çevir
+        console.log(`✅ Loaded ${result.books.length} books from API`);
+        
         const convertedBooks = result.books.map(convertUserBookToBook);
         setBooks(convertedBooks);
-        console.log('✅ Kitaplar yüklendi:', convertedBooks.length, 'kitap');
+        setLastRefresh(Date.now());
         
-        // Redux store'a da kaydet (uyumluluk için) - Geçici olarak devre dışı
-        // const reduxBooks = convertedBooks.map(convertBookToRedux);
-        // dispatch(setBooks(reduxBooks));
+        // Show success message only for manual refresh
+        if (showLoading) {
+          displayToast('success', `📚 ${convertedBooks.length} kitap yüklendi`);
+        }
       } else {
-        console.error('❌ Kitap yükleme hatası:', result.message);
-        // Boş liste göster
-        setBooks([]);
+        console.log('❌ Failed to load books:', result.message);
+        if (showLoading) {
+          displayToast('error', `❌ Kitaplar yüklenemedi: ${result.message}`);
+        }
       }
     } catch (error) {
-      console.error('❌ API Hatası:', error);
-      Alert.alert('Hata', 'Kitaplar yüklenirken bir hata oluştu.');
-      setBooks([]);
+      console.error('💥 API Error:', error);
+      if (showLoading) {
+        displayToast('error', '❌ Bağlantı hatası');
+      }
     } finally {
-      setIsLoading(false);
+      setIsLoadingBooks(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
-  // Backend UserBook'u uygulama Book modeline çevir
+  // UserBook -> Book dönüştürücü - Progress hesaplamayı düzeltelim
   function convertUserBookToBook(userBook: UserBook): Book {
-    // Backend'den gelen status değerlerini app status'lara çevir
-    let status: BookStatus;
-    switch (userBook.status) {
-      case 'reading': status = BookStatus.READING; break;
-      case 'completed': status = BookStatus.COMPLETED; break;
+    const currentPageNum = userBook.current_page || 0;
+    const pageCountNum = userBook.page_count || 0;
+    const progress = pageCountNum > 0 ? (currentPageNum / pageCountNum) * 100 : 0;
+    
+    // Status mapping'i daha güvenli yapalım
+    let bookStatus: BookStatus;
+    const rawStatus = userBook.status?.toLowerCase();
+    
+    switch (rawStatus) {
+      case 'reading':
+      case 'READING':
+        bookStatus = BookStatus.READING;
+        break;
+      case 'completed':
+      case 'COMPLETED':
+      case 'finished':
+      case 'FINISHED':
+        bookStatus = BookStatus.COMPLETED;
+        break;
       case 'to_read': 
-      case 'paused':
-      case 'dropped':
-      default: status = BookStatus.TO_READ; break;
+      case 'TO_READ':
+      case 'want_to_read':
+      case 'WANT_TO_READ':
+      case 'planned':
+      case 'PLANNED':
+        bookStatus = BookStatus.TO_READ;
+        break;
+      default:
+        bookStatus = BookStatus.TO_READ;
     }
 
-    // Progress hesaplama (current_page kullan)
-    const currentPage = userBook.current_page || 0;
-    const progress = userBook.page_count > 0 ? 
-      Math.round((currentPage / userBook.page_count) * 100) : 0;
-
-    return {
-      id: userBook.id,
-      title: userBook.title,
-      author: userBook.author,
-      coverURL: userBook.cover_image_url || 'https://via.placeholder.com/200x300?text=Kapak+Yok',
-      pageCount: userBook.page_count || 0,
-      currentPage: currentPage,
-      progress: progress,
-      status: status,
-      createdAt: typeof userBook.createdAt === 'string' ? userBook.createdAt : new Date(userBook.createdAt).toISOString(),
-      updatedAt: typeof userBook.updatedAt === 'string' ? userBook.updatedAt : new Date(userBook.updatedAt).toISOString(),
-      notes: [],
-      genre: userBook.genre || 'Genel',
-      publishYear: new Date().getFullYear(),
-      publisher: 'Bilinmiyor',
+    const convertedBook: Book = {
+      id: userBook.id.toString(),
+      title: userBook.title || 'Başlıksız Kitap',
+      author: userBook.author || 'Bilinmeyen Yazar',
       description: '',
+      coverURL: userBook.cover_image_url || 'https://via.placeholder.com/300x400?text=Kapak+Yok',
+      isbn: '',
+      publisher: '',
+      pageCount: pageCountNum,
+      currentPage: currentPageNum,
+      progress: Math.round(Math.min(100, Math.max(0, progress))),
+      rating: userBook.rating || 0,
+      status: bookStatus,
+      createdAt: userBook.createdAt || new Date().toISOString(),
+      notes: [],
     };
+
+    console.log(`📊 Book converted: ${convertedBook.title}`, {
+      currentPage: convertedBook.currentPage,
+      pageCount: convertedBook.pageCount,
+      progress: convertedBook.progress,
+      status: convertedBook.status
+    });
+
+    return convertedBook;
   }
 
-  // Uygulama Book'unu Redux formatına çevir (uyumluluk için)
+  // Pull to refresh handler
+  const handleRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
+    setIsRefreshing(true);
+    try {
+      await loadBooksFromAPI(true, true); // Force refresh
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Route parametrelerini dinle - optimize edildi
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('👀 LibraryScreen focused');
+      
+      // BookDetail'den dönen parametreleri kontrol et
+      const route = navigation.getState?.()?.routes?.find(r => r.name === 'Library');
+      if (route?.params?.shouldRefresh) {
+        console.log('🔄 Should refresh from route params');
+        handleRefresh();
+        
+        // Parametreyi temizle
+        navigation.setParams({ shouldRefresh: false });
+        return; // Don't load again below
+      }
+      
+      // Son yenileme zamanını kontrol et
+      const timeSinceLastRefresh = Date.now() - lastRefresh;
+      if (timeSinceLastRefresh > 10000) { // 10 saniyeden fazla ise yenile
+        console.log('⏰ Last refresh was more than 10 seconds ago, refreshing...');
+        loadBooksFromAPI();
+      } else {
+        console.log('⏰ Recent refresh, skipping API call');
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, lastRefresh]); // lastRefresh dependency eklendi
+
+  // Component mount olduğunda sadece bir kez yükle
+  React.useEffect(() => {
+    console.log('🚀 LibraryScreen mounted, currentUserId:', currentUserId);
+    if (currentUserId && books.length === 0) { // Sadece books boş ise yükle
+      console.log('📚 Loading books on mount');
+      loadBooksFromAPI(true);
+    }
+  }, [currentUserId]); // Sadece currentUserId değiştiğinde
+
+  // Book -> Redux Book dönüştürücü
   function convertBookToRedux(book: Book): any {
     return {
       id: book.id,
       title: book.title,
       author: book.author,
+      description: book.description,
       coverURL: book.coverURL,
-      genre: book.genre,
-      publishYear: book.publishYear,
+      isbn: book.isbn,
       publisher: book.publisher,
       pageCount: book.pageCount,
       currentPage: book.currentPage,
-      progress: book.progress,
-      status: book.status === BookStatus.READING ? 'READING' :
-              book.status === BookStatus.COMPLETED ? 'COMPLETED' : 'TO_READ',
-      description: book.description,
-      notes: book.notes,
-      isSharedWithPartner: false,
-      lastReadingDate: new Date().toISOString(),
-      userId: currentUserId,
+      rating: book.rating,
+      status: book.status,
+      notes: book.notes || [],
     };
   }
 
-  // Arama fonksiyonu
   const onChangeSearch = (query) => setSearchQuery(query);
 
-  // Filtre fonksiyonu
-  const filterBooks = () => {
-    // Öncelikle arama filtrelemesi yap
+  // Filter books based on search query and active filter - memoize edildi
+  const filteredBooks = React.useMemo(() => {
+    console.log(`🔍 Filtering books - Total: ${books.length}, Filter: ${activeFilter}, Search: "${searchQuery}"`);
+    
     let filtered = books;
+
+    // Apply search filter
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
       filtered = filtered.filter(book => 
-        book.title.toLowerCase().includes(query) || 
-        book.author.toLowerCase().includes(query)
+        book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        book.author.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
-    // Sonra durum filtrelemesi yap
-    if (activeFilter === 'Hepsi') return filtered;
-    if (activeFilter === 'Okuyor') return filtered.filter(book => book.status === BookStatus.READING);
-    if (activeFilter === 'Tamamlandı') return filtered.filter(book => book.status === BookStatus.COMPLETED);
-    if (activeFilter === 'Okunacak') return filtered.filter(book => book.status === BookStatus.TO_READ);
-    return filtered;
-  };
 
-  // Kitap detayına git
+    // Apply status filter
+    if (activeFilter !== 'Hepsi') {
+      const statusMap = {
+        'Okuyor': BookStatus.READING,
+        'Tamamlandı': BookStatus.COMPLETED,
+        'Okunacak': BookStatus.TO_READ
+      };
+      const targetStatus = statusMap[activeFilter];
+      filtered = filtered.filter(book => {
+        // Hem enum hem string karşılaştırması yap
+        return book.status === targetStatus || book.status === targetStatus.toString();
+      });
+    }
+
+    console.log(`🔍 Filtered result: ${filtered.length} books`);
+    return filtered;
+  }, [books, activeFilter, searchQuery]); // Dependencies
+
   const goToBookDetail = (bookId) => {
-    console.log('📖 LibraryScreen - Navigating to BookDetail with bookId:', bookId);
+    console.log('📖 LibraryScreen - Navigating to BookDetail with ID:', bookId);
     
     // Backend'den yüklenen kitabı bul
     const book = books.find(b => b.id === bookId);
     console.log('📖 LibraryScreen - Found book:', book ? {
       id: book.id,
       title: book.title,
-      author: book.author
+      author: book.author,
+      status: book.status
     } : 'NOT_FOUND');
-    
-    console.log('📖 LibraryScreen - Full book object:', book);
-    console.log('📖 LibraryScreen - Navigation params will be:', {
-      bookId,
-      bookData: book,
-      onStatusChangeKey: refreshKey
-    });
     
     navigation.navigate('BookDetail', { 
       bookId,
       bookData: book, // Kitap verisini direkt geçir
-      onStatusChangeKey: refreshKey // fonksiyon yerine bir key gönder
+      onStatusChangeKey: refreshKey, // fonksiyon yerine bir key gönder
+      shouldRefreshLibrary: true // Dönüşte refresh sinyali
     });
-    
-    console.log('📖 LibraryScreen - Navigation.navigate called');
   };
-
-  // Status değişikliğini dinle ve veri yükle
-  useFocusEffect(
-    useCallback(() => {
-      // Ekran odaklandığında kitap listesini güncelle ve API'den yükle
-      setRefreshKey(prev => prev + 1);
-      loadBooksFromAPI();
-    }, [currentUserId])
-  );
 
   // 3D Kitaplık görünümüne geç
   const showLibrary3D = () => {
@@ -339,570 +451,627 @@ const LibraryScreen = () => {
     });
   };
 
-  const filteredBooks = filterBooks();
+  // Stats hesaplaması - memoize edildi
+  const stats = React.useMemo(() => {
+    const result = {
+      total: books.length,
+      reading: books.filter(book => {
+        const status = book.status as any;
+        return status === BookStatus.READING || status === 'READING';
+      }).length,
+      completed: books.filter(book => {
+        const status = book.status as any;
+        return status === BookStatus.COMPLETED || status === 'COMPLETED';
+      }).length,
+      toRead: books.filter(book => {
+        const status = book.status as any;
+        return status === BookStatus.TO_READ || status === 'TO_READ';
+      }).length
+    };
+    
+    console.log('📊 Stats calculated:', result);
+    return result;
+  }, [books]);
 
-  const stats = {
-    total: filteredBooks.length,
-    reading: filteredBooks.filter(book => book.status === BookStatus.READING).length,
-    completed: filteredBooks.filter(book => book.status === BookStatus.COMPLETED).length
+  // Toast display function
+  const displayToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
+    console.log(`🍞 Toast: [${type.toUpperCase()}] ${message}`);
+    // You can implement actual toast here if you have a toast component
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Modern Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Kütüphane</Text>
-          <Text style={styles.headerSubtitle}>{stats.total} kitap</Text>
-        </View>
-        
-        <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={styles.headerButton3D}
-            onPress={showLibrary3D}
-          >
-            <MaterialCommunityIcons name="cube-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.headerButtonText}>3D</Text>
-          </TouchableOpacity>
+    <View style={styles.modernContainer}>
+      <StatusBar backgroundColor="#007AFF" barStyle="light-content" />
+      
+      {/* Modern Gradient Header */}
+      <SafeAreaView style={styles.modernHeaderSafeArea}>
+        <View style={styles.modernHeader}>
+          <View style={styles.modernHeaderContent}>
+            <Text style={styles.modernHeaderTitle}>Kütüphanem</Text>
+            <Text style={styles.modernHeaderSubtitle}>
+              {stats.total} kitap • {stats.reading} okunuyor • {stats.completed} tamamlandı
+              {isRefreshing && ' • 🔄 Yenileniyor...'}
+            </Text>
+          </View>
           
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
-          >
-            <MaterialCommunityIcons
-              name={viewMode === 'list' ? 'view-grid' : 'format-list-bulleted'}
-              size={20}
-              color={Colors.textSecondary}
-            />
-          </TouchableOpacity>
+          <View style={styles.modernHeaderActions}>
+            <TouchableOpacity 
+              style={[
+                styles.modernHeaderRefreshButton,
+                isRefreshing && { backgroundColor: 'rgba(255, 255, 255, 0.4)' }
+              ]}
+              onPress={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <MaterialCommunityIcons 
+                name={isRefreshing ? "loading" : "refresh"} 
+                size={20} 
+                color="#fff" 
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.modernHeader3DButton}
+              onPress={showLibrary3D}
+            >
+              <MaterialCommunityIcons name="cube-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.modernHeaderViewButton}
+              onPress={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
+            >
+              <MaterialCommunityIcons
+                name={viewMode === 'list' ? 'view-grid' : 'format-list-bulleted'}
+                size={20}
+                color="#fff"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
 
-      {/* Search Section */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <MaterialCommunityIcons name="magnify" size={20} color={Colors.textSecondary} />
+      <ScrollView 
+        style={styles.modernScrollView}
+        contentContainerStyle={styles.modernScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Modern Search Section */}
+        <View style={styles.modernSearchSection}>
+          <View style={styles.modernSearchContainer}>
+            <MaterialCommunityIcons name="magnify" size={20} color="#007AFF" />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Kitap veya yazar ara"
-              placeholderTextColor={Colors.textSecondary}
+              style={styles.modernSearchInput}
+              placeholder="Kitap veya yazar ara..."
+              placeholderTextColor="#9CA3AF"
               value={searchQuery}
               onChangeText={onChangeSearch}
             />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <MaterialCommunityIcons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
-      </View>
 
-      {/* Filters and Stats Section */}
-      <View style={styles.filtersSection}>
-        {/* Filter Chips */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.chipContainer}
-        >
-          <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              activeFilter === 'Hepsi' && styles.filterChipActive
-            ]}
-            onPress={() => setActiveFilter('Hepsi')}
+        {/* Scrollable Compact Statistics Section */}
+        <View style={styles.compactStatsSection}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.compactStatsContainer}
           >
-            <Text style={[
-              styles.filterChipText,
-              activeFilter === 'Hepsi' && styles.filterChipTextActive
-            ]}>
-              Tümü
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              activeFilter === 'Okuyor' && styles.filterChipActive
-            ]}
-            onPress={() => setActiveFilter('Okuyor')}
-          >
-            <Text style={[
-              styles.filterChipText,
-              activeFilter === 'Okuyor' && styles.filterChipTextActive
-            ]}>
-              Okuduklarım
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              activeFilter === 'Tamamlandı' && styles.filterChipActive
-            ]}
-            onPress={() => setActiveFilter('Tamamlandı')}
-          >
-            <Text style={[
-              styles.filterChipText,
-              activeFilter === 'Tamamlandı' && styles.filterChipTextActive
-            ]}>
-              Tamamlananlar
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              activeFilter === 'Okunacak' && styles.filterChipActive
-            ]}
-            onPress={() => setActiveFilter('Okunacak')}
-          >
-            <Text style={[
-              styles.filterChipText,
-              activeFilter === 'Okunacak' && styles.filterChipTextActive
-            ]}>
-              Okunacaklar
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-        
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name="book-multiple" size={18} color={Colors.primary} />
-            <Text style={styles.statValue}>{stats.total}</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name="book-open" size={18} color={Colors.warning} />
-            <Text style={styles.statValue}>{stats.reading}</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name="check-circle" size={18} color={Colors.success} />
-            <Text style={styles.statValue}>{stats.completed}</Text>
-          </View>
-        </View>
-      </View>
+            <View style={styles.compactStatItem}>
+              <MaterialCommunityIcons name="book-multiple" size={18} color="#007AFF" />
+              <Text style={styles.compactStatValue}>{stats.total}</Text>
+              <Text style={styles.compactStatLabel}>Toplam</Text>
+            </View>
 
-      {/* Books List/Grid */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Kütüphaneniz yükleniyor...</Text>
+            <View style={styles.compactStatItem}>
+              <MaterialCommunityIcons name="book-open" size={18} color="#FF9500" />
+              <Text style={styles.compactStatValue}>{stats.reading}</Text>
+              <Text style={styles.compactStatLabel}>Okunuyor</Text>
+            </View>
+
+            <View style={styles.compactStatItem}>
+              <MaterialCommunityIcons name="check" size={18} color="#4CAF50" />
+              <Text style={styles.compactStatValue}>{stats.completed}</Text>
+              <Text style={styles.compactStatLabel}>Tamamlandı</Text>
+            </View>
+
+            <View style={styles.compactStatItem}>
+              <MaterialCommunityIcons name="bookmark" size={18} color="#FF6B6B" />
+              <Text style={styles.compactStatValue}>{stats.toRead}</Text>
+              <Text style={styles.compactStatLabel}>Okunacak</Text>
+            </View>
+
+            <View style={styles.compactStatItem}>
+              <MaterialCommunityIcons name="clock" size={18} color="#8B5CF6" />
+              <Text style={styles.compactStatValue}>
+                {books.filter(book => book.progress > 0 && book.progress < 100).length}
+              </Text>
+              <Text style={styles.compactStatLabel}>Devam Eden</Text>
+            </View>
+
+            <View style={styles.compactStatItem}>
+              <MaterialCommunityIcons name="star" size={18} color="#F59E0B" />
+              <Text style={styles.compactStatValue}>
+                {books.filter(book => book.rating > 0).length}
+              </Text>
+              <Text style={styles.compactStatLabel}>Puanlandı</Text>
+            </View>
+          </ScrollView>
         </View>
-      ) : filteredBooks.length > 0 ? (
-        <FlatList
-          data={filteredBooks}
-          renderItem={({ item }) => {
-            console.log('📖 FlatList rendering item:', item.id, item.title);
-            return (
+
+        {/* Modern Filter Chips */}
+        <View style={styles.modernFiltersSection}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.modernChipContainer}
+          >
+            {[
+              { key: 'Hepsi', label: 'Tümü', icon: 'book-multiple' },
+              { key: 'Okuyor', label: 'Okunuyor', icon: 'book-open' },
+              { key: 'Tamamlandı', label: 'Tamamlandı', icon: 'check' },
+              { key: 'Okunacak', label: 'Okunacak', icon: 'bookmark' }
+            ].map((filter) => (
+              <TouchableOpacity 
+                key={filter.key}
+                style={[
+                  styles.modernFilterChip, 
+                  activeFilter === filter.key && styles.modernFilterChipActive
+                ]}
+                onPress={() => setActiveFilter(filter.key)}
+              >
+                <MaterialCommunityIcons 
+                  name={filter.icon as any} 
+                  size={16} 
+                  color={activeFilter === filter.key ? '#fff' : '#007AFF'} 
+                />
+                <Text style={[
+                  styles.modernFilterChipText,
+                  activeFilter === filter.key && styles.modernFilterChipTextActive
+                ]}>
+                  {filter.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Books List/Grid */}
+        {isLoading ? (
+          <View style={styles.modernLoadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.modernLoadingText}>Kütüphaneniz yükleniyor...</Text>
+          </View>
+        ) : filteredBooks.length > 0 ? (
+          <FlatList
+            data={filteredBooks}
+            renderItem={({ item }) => (
               <BookItem 
                 book={item} 
-                onPress={() => {
-                  console.log('📖 BookItem onPress called with item.id:', item.id);
-                  goToBookDetail(item.id);
-                }} 
+                onPress={() => goToBookDetail(item.id)} 
                 viewMode={viewMode}
               />
-            );
-          }}
-          keyExtractor={(item) => item.id}
-          numColumns={viewMode === 'grid' ? 2 : 1}
-          key={viewMode} // Force re-render on layout change
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.booksList}
-          onRefresh={loadBooksFromAPI}
-          refreshing={isLoading}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIconContainer}>
-            <MaterialCommunityIcons name="book-outline" size={48} color="#BBBBBB" />
+            )}
+            keyExtractor={(item) => item.id}
+            numColumns={viewMode === 'grid' ? 2 : 1}
+            key={viewMode} // Force re-render on layout change
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modernBooksList}
+            onRefresh={handleRefresh}
+            refreshing={isRefreshing}
+            scrollEnabled={false}
+          />
+        ) : (
+          <View style={styles.modernEmptyState}>
+            <View style={styles.modernEmptyIconContainer}>
+              <MaterialCommunityIcons name="book-outline" size={64} color="#007AFF" />
+            </View>
+            <Text style={styles.modernEmptyStateTitle}>
+              {searchQuery ? 'Arama sonucu bulunamadı' : 'Kütüphaneniz boş'}
+            </Text>
+            <Text style={styles.modernEmptyStateSubtitle}>
+              {searchQuery 
+                ? 'Arama kriterlerinize uygun kitap bulunamadı. Farklı kelimeler deneyin.' 
+                : 'Henüz kütüphanenize kitap eklememişsiniz. İlk kitabınızı ekleyerek başlayın!'}
+            </Text>
+            {!searchQuery && (
+              <TouchableOpacity 
+                style={styles.modernAddFirstBookButton}
+                onPress={() => navigation.navigate('WishlistScreen')}
+              >
+                <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+                <Text style={styles.modernAddFirstBookText}>İlk Kitabını Ekle</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={styles.emptyStateTitle}>Kütüphaneniz boş</Text>
-          <Text style={styles.emptyStateSubtitle}>
-            {searchQuery ? 'Arama kriterlerinize uygun kitap bulunamadı' : 'Henüz kütüphanenize kitap eklenmemiş'}
-          </Text>
-          {!searchQuery && (
-            <TouchableOpacity 
-              style={styles.addFirstBookButton}
-              onPress={() => navigation.navigate('WishlistScreen')}
-            >
-              <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
-              <Text style={styles.addFirstBookText}>İlk Kitabını Ekle</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-    </SafeAreaView>
+        )}
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  modernContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#007AFF',
   },
-  header: {
+  modernHeaderSafeArea: {
+    backgroundColor: '#007AFF',
+  },
+  modernHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg,
-    backgroundColor: Colors.headerBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: '#007AFF',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
   },
-  headerContent: {
+  modernHeaderContent: {
     flex: 1,
   },
-  headerTitle: {
+  modernHeaderTitle: {
     fontSize: FontSizes.xl,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 2,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
   },
-  headerSubtitle: {
+  modernHeaderSubtitle: {
     fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
   },
-  headerActions: {
+  modernHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  headerButton: {
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: BorderRadius.full,
-    padding: Spacing.md,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+  modernHeaderRefreshButton: {
+    padding: Spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
   },
-  headerButton3D: {
-    backgroundColor: Colors.primary,
+  modernHeader3DButton: {
+    padding: Spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+  },
+  modernHeaderViewButton: {
+    padding: Spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+  },
+  modernScrollView: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
+  modernScrollContent: {
+    paddingBottom: Spacing.xxl,
+  },
+  modernSearchSection: {
+    padding: Spacing.lg,
+  },
+  modernSearchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-    height: 44,
-    minWidth: 60,
-  },
-  headerButtonText: {
-    color: Colors.surface,
-    fontWeight: '600',
-    marginLeft: Spacing.xs,
-    fontSize: FontSizes.sm,
-  },
-  searchSection: {
+    backgroundColor: '#fff',
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  searchContainer: {},
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: 16,
     gap: Spacing.sm,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 2,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E5E7EB',
   },
-  searchInput: {
+  modernSearchInput: {
     flex: 1,
     fontSize: FontSizes.md,
-    color: Colors.text,
+    color: '#1F2937',
+    fontWeight: '500',
   },
-  filtersSection: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
+  modernHeroStats: {
+    padding: Spacing.lg,
+  },
+  modernSectionTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: Spacing.lg,
+  },
+  modernStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: Spacing.md,
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  chipContainer: {
+  modernStatCard: {
+    backgroundColor: '#fff',
+    padding: Spacing.lg,
+    borderRadius: 16,
+    flex: 1,
+    marginHorizontal: Spacing.xs,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modernStatIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  modernStatValue: {
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: Spacing.xs,
+  },
+  modernStatLabel: {
+    fontSize: FontSizes.sm,
+    color: '#6B7280',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  modernFiltersSection: {
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
   },
-  filterChip: {
-    backgroundColor: Colors.backgroundGray,
-    paddingHorizontal: Spacing.md,
+  modernChipContainer: {
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    marginRight: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterChipText: {
-    fontSize: FontSizes.sm,
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  filterChipTextActive: {
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: Spacing.lg,
-  },
-  statItem: {
+  modernFilterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.coolGray,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: Colors.borderSoft,
+    backgroundColor: '#fff',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: 20,
+    marginRight: Spacing.sm,
+    borderWidth: 2,
+    borderColor: '#007AFF',
     gap: Spacing.xs,
   },
-  statValue: {
+  modernFilterChipActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  modernFilterChipText: {
     fontSize: FontSizes.sm,
+    color: '#007AFF',
     fontWeight: '600',
-    color: Colors.text,
   },
-  booksList: {
-    padding: Spacing.md,
-    paddingBottom: 100,
+  modernFilterChipTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
-  bookItem: {
-    marginBottom: Spacing.md,
+  modernBooksList: {
+    padding: Spacing.lg,
+    paddingTop: 0,
   },
-  bookItemGrid: {
+  modernBookItem: {
+    marginBottom: Spacing.lg,
+  },
+  modernBookItemGrid: {
     flex: 0.5,
     marginHorizontal: Spacing.xs,
   },
-  bookItemList: {
-    marginHorizontal: Spacing.sm,
+  modernBookItemList: {
+    marginHorizontal: 0,
   },
-  bookCard: {
-    borderRadius: BorderRadius.lg,
+  modernBookCard: {
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: Colors.surface,
-    shadowColor: Colors.shadowMedium,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#fff',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E5E7EB',
   },
-  bookCardGrid: {
-    aspectRatio: 0.7,
+  modernBookCardGrid: {
+    aspectRatio: 0.65,
   },
-  bookCardList: {
+  modernBookCardList: {
     flexDirection: 'row',
-    aspectRatio: 3,
+    aspectRatio: 2.5,
   },
-  bookCoverContainer: {
-    backgroundColor: Colors.bookCover,
+  modernBookCoverContainer: {
+    backgroundColor: '#F3F4F6',
     position: 'relative',
   },
-  bookCoverContainerGrid: {
+  modernBookCoverContainerGrid: {
     flex: 2,
   },
-  bookCoverContainerList: {
-    width: 80,
+  modernBookCoverContainerList: {
+    width: 100,
   },
-  bookCover: {
+  modernBookCover: {
     width: '100%',
     height: '100%',
   },
-  statusBadge: {
+  modernStatusBadge: {
     position: 'absolute',
     top: Spacing.sm,
     right: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  statusBadgeText: {
-    fontSize: FontSizes.xs,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  bookContent: {
+  modernBookContent: {
     flex: 1,
-    padding: Spacing.md,
+    padding: Spacing.lg,
     justifyContent: 'space-between',
   },
-  bookTitleContainer: {
+  modernBookTitleContainer: {
     marginBottom: Spacing.sm,
   },
-  bookTitle: {
+  modernBookTitle: {
     fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.text,
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: Spacing.xs,
+    lineHeight: FontSizes.md * 1.3,
   },
-  bookAuthor: {
+  modernBookAuthor: {
     fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
+    color: '#6B7280',
+    fontWeight: '500',
   },
-  progressContainer: {
+  modernProgressContainer: {
     marginTop: Spacing.sm,
   },
-  progressBarContainer: {
+  modernProgressBarContainer: {
     height: 6,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
+    backgroundColor: '#E5E7EB',
     marginBottom: Spacing.sm,
     overflow: 'hidden',
     position: 'relative',
   },
-  progressBackground: {
+  modernProgressBackground: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#E5E7EB',
   },
-  progressFill: {
+  modernProgressFill: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: '#007AFF',
-    borderRadius: BorderRadius.sm,
+    borderRadius: 3,
   },
-  progressText: {
-    fontSize: 12,
-    alignSelf: 'flex-end',
+  modernProgressInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  progressValue: {
-    color: '#007AFF',
-    fontWeight: 'bold',
+  modernProgressText: {
+    fontSize: FontSizes.xs,
   },
-  progressTotal: {
-    color: '#666666',
+  modernProgressValue: {
+    fontWeight: '700',
+  },
+  modernProgressTotal: {
+    color: '#9CA3AF',
     fontWeight: '600',
   },
-  bookActions: {
-    marginTop: Spacing.sm,
+  modernProgressPercent: {
+    fontSize: FontSizes.xs,
+    fontWeight: '700',
   },
-  actionButton: {
+  modernBookActions: {
+    marginTop: Spacing.md,
+  },
+  modernActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primary,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignSelf: 'flex-start',
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 12,
+    gap: Spacing.xs,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
-  actionButtonText: {
-    color: Colors.surface,
+  modernActionButtonText: {
+    color: '#fff',
     fontSize: FontSizes.sm,
     fontWeight: '600',
-    marginLeft: Spacing.xs,
   },
-  emptyState: {
-    flex: 1,
+  modernEmptyState: {
+    alignItems: 'center',
+    padding: Spacing.xxl,
+    backgroundColor: '#fff',
+    marginHorizontal: Spacing.lg,
+    borderRadius: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modernEmptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.xl,
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    marginBottom: Spacing.lg,
   },
-  emptyIconContainer: {
+  modernEmptyStateTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: Spacing.md,
-  },
-  emptyStateTitle: {
-    fontSize: FontSizes.xl,
-    color: Colors.textSecondary,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  emptyStateSubtitle: {
-    fontSize: FontSizes.md,
-    color: Colors.textTertiary,
     textAlign: 'center',
-    lineHeight: 20,
   },
-  addFirstBookButton: {
-    backgroundColor: Colors.primary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.full,
+  modernEmptyStateSubtitle: {
+    fontSize: FontSizes.md,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: FontSizes.md * 1.4,
+    marginBottom: Spacing.lg,
+  },
+  modernAddFirstBookButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
+    elevation: 6,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  addFirstBookText: {
-    color: Colors.surface,
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
+  modernAddFirstBookText: {
+    color: '#fff',
+    fontSize: FontSizes.md,
+    fontWeight: '700',
   },
-  imageLoadingContainer: {
+  modernImageLoadingContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -910,31 +1079,79 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundGray,
+    backgroundColor: '#F3F4F6',
   },
-  noCoverPlaceholder: {
+  modernNoCoverPlaceholder: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundGray,
+    backgroundColor: '#F3F4F6',
     padding: Spacing.md,
   },
-  noCoverText: {
-    fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
+  modernNoCoverText: {
+    fontSize: FontSizes.xs,
+    color: '#9CA3AF',
     marginTop: Spacing.xs,
     textAlign: 'center',
+    fontWeight: '500',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  modernLoadingContainer: {
     alignItems: 'center',
-    padding: Spacing.xl,
+    padding: Spacing.xxl,
+    backgroundColor: '#fff',
+    marginHorizontal: Spacing.lg,
+    borderRadius: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  loadingText: {
-    color: Colors.textSecondary,
+  modernLoadingText: {
+    color: '#6B7280',
     marginTop: Spacing.md,
+    fontSize: FontSizes.md,
+    fontWeight: '500',
+  },
+  compactStatsSection: {
+    backgroundColor: '#fff',
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  compactStatsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+  },
+  compactStatItem: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    minWidth: 80,
+  },
+  compactStatValue: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: Spacing.xs,
+  },
+  compactStatLabel: {
+    fontSize: FontSizes.xs,
+    color: '#6B7280',
+    fontWeight: '600',
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
 

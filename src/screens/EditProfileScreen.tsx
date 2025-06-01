@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, Alert, TouchableOpacity, Image, Switch, Modal } from 'react-native';
-import { Text, TextInput, Button, Surface, HelperText } from 'react-native-paper';
+import { 
+  StyleSheet, 
+  View, 
+  ScrollView, 
+  Alert, 
+  TouchableOpacity, 
+  Image, 
+  Switch, 
+  Modal,
+  SafeAreaView,
+  StatusBar
+} from 'react-native';
+import { Text, TextInput, Surface, HelperText } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppSelector } from '../store';
@@ -274,9 +285,13 @@ const EditProfileScreen = () => {
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: Colors.background }]}>
-        <Text style={[styles.loadingText, { color: Colors.text }]}>Yükleniyor...</Text>
-      </View>
+      <SafeAreaView style={styles.loadingContainer}>
+        <StatusBar backgroundColor="#007AFF" barStyle="light-content" />
+        <View style={styles.loadingContent}>
+          <MaterialCommunityIcons name="account-circle" size={64} color="#007AFF" />
+          <Text style={styles.loadingText}>Profil bilgileri yükleniyor...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -296,151 +311,209 @@ const EditProfileScreen = () => {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: Colors.background }]} showsVerticalScrollIndicator={false}>
-      {/* Profil Fotoğrafı Bölümü */}
-      <Surface style={[styles.profileSection, { backgroundColor: Colors.surface }]}>
-        <View style={styles.avatarContainer}>
-          {renderAvatar()}
-          <TouchableOpacity 
-            style={styles.editIconContainer}
-            onPress={() => Alert.alert('Profil Fotoğrafı', 'Profil fotoğrafı yükleme özelliği yakında eklenecek.', [
-              { text: 'Tamam', style: 'cancel' }
-            ])}
-            disabled={saving}
-          >
-            <MaterialCommunityIcons name="camera" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        
-        <TouchableOpacity onPress={() => Alert.alert('Profil Fotoğrafı', 'Profil fotoğrafı yükleme özelliği yakında eklenecek.', [
-          { text: 'Tamam', style: 'cancel' }
-        ])} disabled={saving}>
-          <Text style={styles.changePhotoText}>Profil Fotoğrafını Değiştir</Text>
-        </TouchableOpacity>
-      </Surface>
-
-      {/* Kişisel Bilgiler */}
-      <Surface style={[styles.formSection, { backgroundColor: Colors.surface }]}>
-        <Text style={[styles.sectionTitle, { color: Colors.text }]}>Kişisel Bilgiler</Text>
-        
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Ad Soyad</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            style={[styles.input, errors.name && styles.inputError]}
-            disabled={saving}
-            placeholder="Adınızı ve soyadınızı giriniz"
-          />
-          {errors.name && (
-            <HelperText type="error" style={styles.errorText}>Ad Soyad gerekli</HelperText>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>E-posta</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            style={[styles.input, errors.email && styles.inputError]}
-            disabled={saving}
-            placeholder="E-posta adresinizi giriniz"
-          />
-          {errors.email && (
-            <HelperText type="error" style={styles.errorText}>Geçerli bir e-posta adresi girin</HelperText>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Telefon (Opsiyonel)</Text>
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            style={styles.input}
-            disabled={saving}
-            placeholder="Telefon numaranızı giriniz"
-          />
-        </View>
-      </Surface>
-
-      {/* Okuma Tercihleri */}
-      <Surface style={[styles.formSection, { backgroundColor: Colors.surface }]}>
-        <Text style={[styles.sectionTitle, { color: Colors.text }]}>Okuma Tercihleri</Text>
-        
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Günlük Okuma Hedefi (dakika)</Text>
-          <TextInput
-            value={readingGoal}
-            onChangeText={setReadingGoal}
-            keyboardType="numeric"
-            style={[styles.input, errors.readingGoal && styles.inputError]}
-            disabled={saving}
-            placeholder="Günlük okuma hedefinizi giriniz"
-          />
-          {errors.readingGoal && (
-            <HelperText type="error" style={styles.errorText}>Geçerli bir sayı girin (minimum 1 dakika)</HelperText>
-          )}
-        </View>
-      </Surface>
-
-      {/* Uygulama Ayarları */}
-      <Surface style={[styles.formSection, { backgroundColor: Colors.surface }]}>
-        <Text style={[styles.sectionTitle, { color: Colors.text }]}>Uygulama Ayarları</Text>
-        
-        <View style={styles.switchContainer}>
-          <View style={styles.switchLabelContainer}>
-            <MaterialCommunityIcons name="bell" size={24} color="#6366f1" />
-            <Text style={[styles.switchLabel, { color: Colors.text }]}>Bildirimler</Text>
-          </View>
-          <Switch
-            value={notifications}
-            onValueChange={setNotifications}
-            disabled={saving}
-            trackColor={{ false: '#f3f4f6', true: '#6366f1' }}
-            thumbColor={notifications ? '#fff' : '#9ca3af'}
-          />
-        </View>
-      </Surface>
-
-      {/* Hesap Güvenliği */}
-      <Surface style={[styles.securitySection, { backgroundColor: Colors.surface }]}>
-        <Text style={[styles.sectionTitle, { color: Colors.text }]}>Hesap Güvenliği</Text>
-        
+    <SafeAreaView style={styles.container}>
+      <StatusBar backgroundColor="#007AFF" barStyle="light-content" />
+      
+      {/* Modern Header */}
+      <View style={styles.header}>
         <TouchableOpacity 
-          style={[styles.passwordButton, { backgroundColor: Colors.surface }]}
-          onPress={openPasswordModal}
-          disabled={saving}
-        >
-          <MaterialCommunityIcons name="lock-reset" size={20} color="#7c3aed" />
-          <Text style={[styles.passwordButtonText, { color: Colors.text }]}>Şifre Değiştir</Text>
-          <MaterialCommunityIcons name="chevron-right" size={20} color={Colors.textSecondary} />
-        </TouchableOpacity>
-      </Surface>
-
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={[styles.cancelButton, { backgroundColor: Colors.surface }]}
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
           disabled={saving}
         >
-          <Text style={[styles.cancelButtonText, { color: Colors.text }]}>İptal</Text>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={saving}
-        >
-          {saving ? (
-            <Text style={[styles.saveButtonText, { color: Colors.text }]}>Kaydediliyor...</Text>
-          ) : (
-            <Text style={[styles.saveButtonText, { color: Colors.text }]}>Kaydet</Text>
-          )}
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}></Text>
+        <View style={styles.headerRight} />
       </View>
+
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Modern Profil Fotoğrafı Bölümü */}
+        <Surface style={styles.profileSection}>
+          <View style={styles.avatarContainer}>
+            {renderAvatar()}
+            <TouchableOpacity 
+              style={styles.editIconContainer}
+              onPress={() => Alert.alert('Profil Fotoğrafı', 'Profil fotoğrafı yükleme özelliği yakında eklenecek.')}
+              disabled={saving}
+            >
+              <MaterialCommunityIcons name="camera" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            onPress={() => Alert.alert('Profil Fotoğrafı', 'Profil fotoğrafı yükleme özelliği yakında eklenecek.')} 
+            disabled={saving}
+          >
+            <Text style={styles.changePhotoText}>Profil Fotoğrafını Değiştir</Text>
+          </TouchableOpacity>
+        </Surface>
+
+        {/* Modern Kişisel Bilgiler Kartı */}
+        <Surface style={styles.formSection}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account" size={24} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Kişisel Bilgiler</Text>
+          </View>
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Ad Soyad</Text>
+            <View style={[styles.inputWrapper, errors.name && styles.inputError]}>
+              <MaterialCommunityIcons name="account-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                style={styles.input}
+                disabled={saving}
+                placeholder="Adınızı ve soyadınızı giriniz"
+                placeholderTextColor="#999"
+              />
+            </View>
+            {errors.name && (
+              <Text style={styles.errorText}>Ad Soyad gerekli</Text>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>E-posta</Text>
+            <View style={[styles.inputWrapper, errors.email && styles.inputError]}>
+              <MaterialCommunityIcons name="email-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                style={styles.input}
+                disabled={saving}
+                placeholder="E-posta adresinizi giriniz"
+                placeholderTextColor="#999"
+              />
+            </View>
+            {errors.email && (
+              <Text style={styles.errorText}>Geçerli bir e-posta adresi girin</Text>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Telefon (Opsiyonel)</Text>
+            <View style={styles.inputWrapper}>
+              <MaterialCommunityIcons name="phone-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                style={styles.input}
+                disabled={saving}
+                placeholder="Telefon numaranızı giriniz"
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+        </Surface>
+
+        {/* Modern Okuma Tercihleri Kartı */}
+        <Surface style={styles.formSection}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="book-open-variant" size={24} color="#4ECDC4" />
+            <Text style={styles.sectionTitle}>Okuma Tercihleri</Text>
+          </View>
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Günlük Okuma Hedefi (dakika)</Text>
+            <View style={[styles.inputWrapper, errors.readingGoal && styles.inputError]}>
+              <MaterialCommunityIcons name="target" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                value={readingGoal}
+                onChangeText={setReadingGoal}
+                keyboardType="numeric"
+                style={styles.input}
+                disabled={saving}
+                placeholder="Günlük okuma hedefinizi giriniz"
+                placeholderTextColor="#999"
+              />
+            </View>
+            {errors.readingGoal && (
+              <Text style={styles.errorText}>Geçerli bir sayı girin (minimum 1 dakika)</Text>
+            )}
+          </View>
+        </Surface>
+
+        {/* Modern Uygulama Ayarları Kartı */}
+        <Surface style={styles.formSection}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="cog" size={24} color="#FF6B6B" />
+            <Text style={styles.sectionTitle}>Uygulama Ayarları</Text>
+          </View>
+          
+          <View style={styles.switchContainer}>
+            <View style={styles.switchInfo}>
+              <MaterialCommunityIcons name="bell" size={20} color="#666" />
+              <View style={styles.switchTextContainer}>
+                <Text style={styles.switchLabel}>Bildirimler</Text>
+                <Text style={styles.switchDescription}>Okuma hatırlatmaları ve güncellemeler</Text>
+              </View>
+            </View>
+            <Switch
+              value={notifications}
+              onValueChange={setNotifications}
+              disabled={saving}
+              trackColor={{ false: '#E5E7EB', true: '#007AFF40' }}
+              thumbColor={notifications ? '#007AFF' : '#9CA3AF'}
+            />
+          </View>
+        </Surface>
+
+        {/* Modern Hesap Güvenliği Kartı */}
+        <Surface style={styles.securitySection}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="shield-check" size={24} color="#8B5CF6" />
+            <Text style={styles.sectionTitle}>Hesap Güvenliği</Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.passwordButton}
+            onPress={openPasswordModal}
+            disabled={saving}
+          >
+            <View style={styles.passwordButtonContent}>
+              <MaterialCommunityIcons name="lock-reset" size={20} color="#8B5CF6" />
+              <View style={styles.passwordButtonText}>
+                <Text style={styles.passwordButtonTitle}>Şifre Değiştir</Text>
+                <Text style={styles.passwordButtonSubtitle}>Hesap güvenliğinizi güncelleyin</Text>
+              </View>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+        </Surface>
+
+        {/* Modern Action Buttons */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={() => navigation.goBack()}
+            disabled={saving}
+          >
+            <Text style={styles.cancelButtonText}>İptal</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={saving}
+          >
+            {saving ? (
+              <View style={styles.saveButtonContent}>
+                <MaterialCommunityIcons name="loading" size={18} color="#fff" />
+                <Text style={styles.saveButtonText}>Kaydediliyor...</Text>
+              </View>
+            ) : (
+              <View style={styles.saveButtonContent}>
+                <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                <Text style={styles.saveButtonText}>Kaydet</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Şifre Değiştirme Modal */}
       <Modal
@@ -598,50 +671,93 @@ const EditProfileScreen = () => {
         message={toastMessage}
         onHide={() => setToastVisible(false)}
       />
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
   },
   loadingContainer: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     fontSize: FontSizes.lg,
     fontWeight: '600',
+    color: '#007AFF',
+    marginTop: Spacing.md,
+    textAlign: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  backButton: {
+    padding: Spacing.sm,
+  },
+  headerTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerRight: {
+    width: 40, // backButton ile dengeleme için
+  },
+  scrollContainer: {
+    flex: 1,
   },
   profileSection: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xxl,
     margin: Spacing.lg,
-    marginTop: Spacing.md,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f0f0f0',
   },
   avatarPlaceholder: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: FontSizes.xl,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -649,183 +765,210 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#6366f1',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    elevation: 3,
   },
   changePhotoText: {
     fontSize: FontSizes.md,
-    fontWeight: '500',
-    color: '#6366f1',
+    fontWeight: '600',
+    color: '#007AFF',
     textAlign: 'center',
   },
   formSection: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    margin: Spacing.lg,
-    marginTop: 0,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xl,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
   },
   sectionTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    marginBottom: Spacing.lg,
+    color: '#2C3E50',
+    marginLeft: Spacing.md,
   },
   inputContainer: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   inputLabel: {
     fontSize: FontSizes.sm,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: Spacing.xs,
+    color: '#2C3E50',
+    marginBottom: Spacing.sm,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    minHeight: 52,
+  },
+  inputIcon: {
+    marginRight: Spacing.md,
   },
   input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    flex: 1,
     fontSize: FontSizes.md,
-    color: '#333',
+    color: '#2C3E50',
+    fontWeight: '500',
   },
   inputError: {
-    borderColor: '#ef4444',
+    borderColor: '#FF3B30',
     borderWidth: 2,
+    backgroundColor: '#FFF5F5',
   },
   errorText: {
-    fontSize: FontSizes.xs,
-    color: '#ef4444',
-    marginTop: Spacing.xs,
+    fontSize: FontSizes.sm,
+    color: '#FF3B30',
+    marginTop: Spacing.sm,
+    fontWeight: '500',
   },
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f1f1',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
   },
-  switchLabelContainer: {
+  switchInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+  switchTextContainer: {
+    marginLeft: Spacing.md,
+    flex: 1,
+  },
   switchLabel: {
     fontSize: FontSizes.md,
-    fontWeight: '500',
-    marginLeft: Spacing.sm,
+    fontWeight: '600',
+    color: '#2C3E50',
+  },
+  switchDescription: {
+    fontSize: FontSizes.sm,
+    color: '#6B7280',
+    marginTop: 2,
   },
   securitySection: {
-    backgroundColor: '#f3f0ff',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    margin: Spacing.lg,
-    marginTop: 0,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xl,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
   },
   passwordButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#a78bfa',
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    backgroundColor: '#F8F5FF',
+    borderWidth: 1.5,
+    borderColor: '#E0E7FF',
+    borderRadius: 12,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  passwordButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   passwordButtonText: {
-    fontSize: FontSizes.md,
-    fontWeight: '500',
-    color: '#7c3aed',
-    marginLeft: Spacing.sm,
+    marginLeft: Spacing.md,
     flex: 1,
+  },
+  passwordButtonTitle: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: '#2C3E50',
+  },
+  passwordButtonSubtitle: {
+    fontSize: FontSizes.sm,
+    color: '#6B7280',
+    marginTop: 2,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    margin: Spacing.lg,
-    marginTop: 0,
+    marginHorizontal: Spacing.lg,
     marginBottom: Spacing.xxl,
+    gap: Spacing.md,
   },
   cancelButton: {
     flex: 1,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    paddingVertical: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
   },
   cancelButtonText: {
     fontSize: FontSizes.md,
     fontWeight: '600',
+    color: '#374151',
   },
   saveButton: {
     flex: 1,
-    backgroundColor: '#7c3aed',
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    backgroundColor: '#007AFF',
+    borderRadius: 16,
+    paddingVertical: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: Spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   saveButtonDisabled: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0.1,
+  },
+  saveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   saveButtonText: {
     fontSize: FontSizes.md,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
   },
   // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FAFAFA',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -833,42 +976,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
     fontSize: FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.text,
+    fontWeight: '700',
+    color: '#2C3E50',
   },
   modalContent: {
     flex: 1,
     padding: Spacing.lg,
   },
   infoCard: {
+    backgroundColor: '#F0F8FF',
+    borderRadius: 16,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#f0f4ff',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xl,
-    borderWidth: 1,
-    borderColor: '#e0ebff',
   },
   infoTextContainer: {
-    flex: 1,
     marginLeft: Spacing.md,
+    flex: 1,
   },
   infoTitle: {
     fontSize: FontSizes.md,
     fontWeight: '600',
-    color: Colors.text,
+    color: '#2C3E50',
     marginBottom: Spacing.xs,
   },
   infoText: {
     fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
+    color: '#6B7280',
     lineHeight: 20,
   },
   passwordInputContainer: {

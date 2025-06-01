@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, SafeAreaView, Text, Dimensions, Alert } from 'react-native';
+import { 
+  StyleSheet, 
+  View, 
+  ScrollView, 
+  Image, 
+  TouchableOpacity, 
+  SafeAreaView, 
+  Text, 
+  Dimensions, 
+  Alert,
+  StatusBar,
+  RefreshControl
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/core';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
@@ -19,20 +31,22 @@ const HomeScreen = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Backend API'den reading kitapları yükle
+  // Backend API'den kullanıcının kitaplarını yükle (tüm kitaplar)
   const loadReadingBooksFromAPI = async () => {
     if (!currentUserId) return;
     
     try {
-      // Backend'den 'reading' statusündeki kitapları getir
+      console.log('📚 HomeScreen - Backend API\'den tüm kitaplar yükleniyor...');
+      // Tüm kitapları getir (sadece reading değil)
       const APIService = (await import('../utils/apiService')).default;
-      const result = await APIService.getBooksByStatus('reading');
+      const result = await APIService.getUserBooks(); // Tüm kitapları getir
       
       if (result.success && result.books) {
-        console.log('HomeScreen loading reading books:', {
+        console.log('HomeScreen loading all books:', {
           userId: currentUserId,
-          readingBooksCount: result.books.length,
+          totalBooksCount: result.books.length,
           books: result.books.map(b => ({ 
             id: b.id, 
             title: b.title, 
@@ -42,19 +56,19 @@ const HomeScreen = () => {
           }))
         });
         
-        // Backend UserBook'ları uygulama Book formatına çevir (sadece reading olanlar)
+        // Backend UserBook'ları uygulama Book formatına çevir (tüm statuslar)
         const convertedBooks = result.books.map(convertUserBookToBook);
         
-        // Mevcut Redux kitaplarını al ve reading olanları güncelle
-        const allBooks = books.filter(b => b.userId !== currentUserId || b.status !== 'READING');
-        const updatedBooks = [...allBooks, ...convertedBooks];
+        // Redux store'u güncelle - userId'ye göre filtrele ve güncellenmiş kitapları ekle
+        const otherUsersBooks = books.filter(b => b.userId !== currentUserId);
+        const updatedBooks = [...otherUsersBooks, ...convertedBooks];
         
         dispatch(setBooks(updatedBooks));
       } else {
-        console.error('❌ Reading books loading failed:', result.message);
+        console.error('❌ Books loading failed:', result.message);
       }
     } catch (error) {
-      console.error('Error loading reading books in HomeScreen:', error);
+      console.error('Error loading books in HomeScreen:', error);
     }
   };
   
@@ -64,6 +78,31 @@ const HomeScreen = () => {
     const progress = userBook.page_count > 0 ? 
       Math.round((currentPage / userBook.page_count) * 100) : 0;
 
+    // Status mapping'i düzelt
+    let mappedStatus = 'TO_READ'; // default
+    const rawStatus = userBook.status?.toLowerCase();
+    
+    switch (rawStatus) {
+      case 'reading':
+        mappedStatus = 'READING';
+        break;
+      case 'completed':
+        mappedStatus = 'COMPLETED';
+        break;
+      case 'to_read':
+      case 'want_to_read':
+      case 'planned':
+        mappedStatus = 'TO_READ';
+        break;
+      case 'paused':
+      case 'on_hold':
+        mappedStatus = 'PAUSED';
+        break;
+      default:
+        console.warn(`⚠️ HomeScreen: Unknown status ${userBook.status}, defaulting to TO_READ`);
+        mappedStatus = 'TO_READ';
+    }
+
     return {
       id: userBook.id,
       title: userBook.title,
@@ -72,7 +111,7 @@ const HomeScreen = () => {
       pageCount: userBook.page_count || 0,
       currentPage: currentPage,
       progress: progress,
-      status: 'READING',
+      status: mappedStatus,
       createdAt: new Date(userBook.createdAt).toISOString(),
       notes: [],
       genre: userBook.genre || 'Genel',
@@ -125,33 +164,20 @@ const HomeScreen = () => {
   // Find currently reading book
   const currentlyReading = currentlyReadingBooks.length > 0 ? currentlyReadingBooks[0] : null;
 
-  // Statistics data - using real reading session data
-  const statistics = [
-    {
-      id: '1',
-      value: completedBooks.length.toString(),
-      label: 'Bitirilen Kitap',
-      icon: 'check-circle',
-      color: Colors.success,
-    },
-    {
-      id: '2',
-      value: totalBooks.toString(),
-      label: 'Toplam Kitap',
-      icon: 'book-multiple',
-      color: Colors.primary,
-    },
-    {
-      id: '3',
-      value: readingStats ? readingStats.totalPagesRead.toString() : '0',
-      label: 'Okunan Sayfa',
-      icon: 'book',
-      color: Colors.warning,
-    },
-  ];
+  // Refresh functionality
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadReadingBooksFromAPI();
+    setRefreshing(false);
+  }, []);
 
-  // Partner updates - başta boş, ileride couple system eklenecek
-  const partnerUpdates: any[] = [];
+  // Get greeting based on time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Günaydın';
+    if (hour < 18) return 'İyi günler';
+    return 'İyi akşamlar';
+  };
 
   const goToReadingTimer = () => {
     navigation.navigate('ReadingTimer');
@@ -170,15 +196,21 @@ const HomeScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: Colors.surface }]}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar backgroundColor="#007AFF" barStyle="light-content" />
+      
+      {/* Modern Header */}
+      <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={[styles.greeting, { color: Colors.textSecondary }]}>Ana Sayfa</Text>
-          <Text style={[styles.appName, { color: Colors.primary }]}>BookMate</Text>
+          <Text style={styles.greeting}>{getGreeting()}</Text>
+          <Text style={styles.appName}>
+            {currentUser?.displayName?.split(' ')[0] || 'BookMate Kullanıcısı'}
+          </Text>
         </View>
-        <TouchableOpacity style={styles.settingsButton} onPress={goToProfile}>
-          <MaterialCommunityIcons name="cog" size={24} color={Colors.textSecondary} />
+        <TouchableOpacity style={styles.profileButton} onPress={goToProfile}>
+          <View style={styles.profileButtonInner}>
+            <MaterialCommunityIcons name="account" size={24} color="#007AFF" />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -186,71 +218,97 @@ const HomeScreen = () => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#007AFF"
+            colors={['#007AFF']}
+          />
+        }
       >
+        {/* Hero Statistics Cards */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <View style={styles.statIconContainer}>
+              <MaterialCommunityIcons name="check-circle" size={28} color="#4CAF50" />
+            </View>
+            <Text style={styles.statValue}>{completedBooks.length}</Text>
+            <Text style={styles.statLabel}>Bitirilen</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <View style={styles.statIconContainer}>
+              <MaterialCommunityIcons name="book-open-variant" size={28} color="#FF6B6B" />
+            </View>
+            <Text style={styles.statValue}>{currentlyReadingBooks.length}</Text>
+            <Text style={styles.statLabel}>Okunuyor</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <View style={styles.statIconContainer}>
+              <MaterialCommunityIcons name="book-multiple" size={28} color="#4ECDC4" />
+            </View>
+            <Text style={styles.statValue}>{totalBooks}</Text>
+            <Text style={styles.statLabel}>Toplam</Text>
+          </View>
+        </View>
+
         {/* Current Reading Progress */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: Colors.text }]}>Okuma İlerlemeniz</Text>
+          <Text style={styles.sectionTitle}>📚 Şu Anda Okuduğunuz</Text>
           
           {currentlyReading ? (
             <TouchableOpacity 
-              style={[styles.progressCard, { backgroundColor: Colors.surface }]}
+              style={styles.progressCard}
               onPress={goToReadingTimer}
             >
-              <View style={styles.progressHeader}>
-                <Text style={[styles.currentlyReadingLabel, { color: Colors.textSecondary }]}>ŞU ANDA OKUNAN:</Text>
-              </View>
-              
               <View style={styles.progressContent}>
                 <View style={styles.bookCoverContainer}>
                   <Image 
-                    source={{ uri: currentlyReading.coverURL || 'https://picsum.photos/80/120?random=1' }}
+                    source={{ uri: currentlyReading.coverURL || 'https://via.placeholder.com/80x120?text=Kapak+Yok' }}
                     style={styles.bookCover}
                     resizeMode="cover"
                   />
+                  <View style={styles.progressOverlay}>
+                    <Text style={styles.progressText}>{Math.round(currentlyReading.progress || 0)}%</Text>
+                  </View>
                 </View>
                 
                 <View style={styles.bookDetails}>
-                  <Text style={[styles.bookTitle, { color: Colors.text }]}>{currentlyReading.title}</Text>
-                  <Text style={[styles.bookAuthor, { color: Colors.textSecondary }]}>{currentlyReading.author}</Text>
-                  <Text style={[styles.pageInfo, { color: Colors.textTertiary }]}>
-                    {currentlyReading.currentPage || 0}/{currentlyReading.pageCount || 0} sayfa
+                  <Text style={styles.bookTitle}>{currentlyReading.title}</Text>
+                  <Text style={styles.bookAuthor}>{currentlyReading.author}</Text>
+                  <Text style={styles.pageInfo}>
+                    {currentlyReading.currentPage || 0} / {currentlyReading.pageCount || 0} sayfa
                   </Text>
-                </View>
-              </View>
-              
-              <View style={styles.progressSection}>
-                <View style={styles.progressInfo}>
-                  <Text style={[styles.progressPercentage, { color: Colors.text }]}>%{Math.round(currentlyReading.progress || 0)} Tamamlandı</Text>
-                  <MaterialCommunityIcons 
-                    name="chevron-right" 
-                    size={20} 
-                    color={Colors.textSecondary} 
-                  />
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBar, { backgroundColor: Colors.backgroundGray }]}>
-                    <View 
-                      style={[
-                        styles.progressFill, 
-                        { width: `${currentlyReading.progress || 0}%`, backgroundColor: Colors.primary }
-                      ]} 
-                    />
+                  
+                  <View style={styles.progressBarContainer}>
+                    <View style={styles.progressBar}>
+                      <View 
+                        style={[styles.progressFill, { width: `${currentlyReading.progress || 0}%` }]} 
+                      />
+                    </View>
                   </View>
                 </View>
+
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#9CA3AF" />
               </View>
             </TouchableOpacity>
           ) : (
-            <View style={[styles.emptyStateCard, { backgroundColor: Colors.surface }]}>
-              <MaterialCommunityIcons name="book-plus" size={48} color={Colors.textSecondary} />
-              <Text style={[styles.emptyStateTitle, { color: Colors.text }]}>Henüz kitap okumuyorsunuz</Text>
-              <Text style={[styles.emptyStateText, { color: Colors.textSecondary }]}>
-                Kütüphanenizden bir kitap seçin ve okumaya başlayın!
+            <View style={styles.emptyStateCard}>
+              <View style={styles.emptyStateIcon}>
+                <MaterialCommunityIcons name="book-plus" size={48} color="#007AFF" />
+              </View>
+              <Text style={styles.emptyStateTitle}>Henüz kitap okumuyorsunuz</Text>
+              <Text style={styles.emptyStateText}>
+                Kütüphanenizden bir kitap seçip okumaya başlayın!
               </Text>
               <TouchableOpacity 
-                style={[styles.emptyStateButton, { backgroundColor: Colors.primary }]}
+                style={styles.emptyStateButton}
                 onPress={() => navigation.navigate('Library')}
               >
-                <Text style={[styles.emptyStateButtonText, { color: Colors.surface }]}>Kütüphaneye Git</Text>
+                <MaterialCommunityIcons name="library" size={18} color="#fff" />
+                <Text style={styles.emptyStateButtonText}>Kütüphaneye Git</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -259,95 +317,114 @@ const HomeScreen = () => {
         {/* Partner Updates */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: Colors.text }]}>Ortak Güncellemeler</Text>
-            <TouchableOpacity onPress={handleAddPartner}>
-              <MaterialCommunityIcons name="plus" size={20} color={Colors.primary} />
+            <Text style={styles.sectionTitle}>📚 Ortak Okuma</Text>
+            <TouchableOpacity style={styles.addButton} onPress={handleAddPartner}>
+              <MaterialCommunityIcons name="plus" size={18} color="#007AFF" />
             </TouchableOpacity>
           </View>
           
-          <View style={styles.updatesContainer}>
-            {partnerUpdates.length > 0 ? (
-              partnerUpdates.map((update) => (
-                <View key={update.id} style={[styles.updateCard, { backgroundColor: Colors.surface }]}>
-                  <View style={styles.updateContent}>
-                    <View style={styles.avatarContainer}>
-                      <Image 
-                        source={{ uri: update.avatar }}
-                        style={styles.avatar}
-                      />
-                    </View>
-                    <View style={styles.updateTextContainer}>
-                      <Text style={[styles.updateText, { color: Colors.text }]}>
-                        <Text style={[styles.partnerName, { color: Colors.text }]}>{update.name}</Text>
-                        <Text style={[styles.updateActivity, { color: Colors.textSecondary }]}> {update.activity}</Text>
-                      </Text>
-                      <Text style={[styles.updateTime, { color: Colors.textTertiary }]}>{update.time}</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity style={styles.heartButton}>
-                    <MaterialCommunityIcons 
-                      name="heart-outline" 
-                      size={20} 
-                      color={Colors.textSecondary} 
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))
-            ) : (
-              <View style={[styles.emptyUpdatesCard, { backgroundColor: Colors.surface }]}>
-                <MaterialCommunityIcons name="heart-plus" size={32} color={Colors.textSecondary} />
-                <Text style={[styles.emptyUpdatesTitle, { color: Colors.text }]}>Henüz ortak okuma yapmıyorsunuz</Text>
-                <Text style={[styles.emptyUpdatesText, { color: Colors.textSecondary }]}>
-                  Partnerinizi ekleyerek birlikte okuma deneyimi yaşayın!
-                </Text>
-              </View>
-            )}
+          <View style={styles.partnerCard}>
+            <View style={styles.partnerIcon}>
+              <MaterialCommunityIcons name="account-multiple-plus" size={32} color="#007AFF" />
+            </View>
+            <Text style={styles.partnerTitle}>Partnerinizi Ekleyin</Text>
+            <Text style={styles.partnerSubtitle}>
+              Sevgiliniz, arkadaşınız veya ailenizle birlikte okuma deneyimi yaşayın
+            </Text>
+            <TouchableOpacity style={styles.partnerButton} onPress={handleAddPartner}>
+              <Text style={styles.partnerButtonText}>Yakında</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: Colors.text }]}>Hızlı İşlemler</Text>
-          
-          <View style={styles.quickActionsContainer}>
-            <TouchableOpacity 
-              style={[styles.quickActionCard, { backgroundColor: Colors.surface }]}
-              onPress={() => navigation.navigate('Library')}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.primary }]}>
-                <MaterialCommunityIcons name="library" size={24} color="white" />
-              </View>
-              <Text style={[styles.quickActionText, { color: Colors.text }]}>Kütüphane</Text>
-            </TouchableOpacity>
+        {/* Daily Reading Goal */}
+        {readingStats && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🎯 Günlük Hedef</Text>
             
-            <TouchableOpacity 
-              style={[styles.quickActionCard, { backgroundColor: Colors.surface }]}
-              onPress={goToReadingTimer}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.success }]}>
-                <MaterialCommunityIcons name="timer" size={24} color="white" />
-              </View>
-              <Text style={[styles.quickActionText, { color: Colors.text }]}>Zamanlayıcı</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Statistics */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: Colors.text }]}>İstatistikler</Text>
-          
-          <View style={styles.statisticsContainer}>
-            {statistics.map((stat, index) => (
-              <View key={stat.id} style={[styles.statCard, { backgroundColor: Colors.surface }, index === 1 && styles.middleStatCard]}>
-                <View style={[styles.statIcon, { backgroundColor: stat.color }]}>
-                  <MaterialCommunityIcons name={stat.icon as any} size={20} color="white" />
+            <View style={styles.goalCard}>
+              <View style={styles.goalProgress}>
+                <View style={styles.goalIconContainer}>
+                  <MaterialCommunityIcons name="target" size={24} color="#4ECDC4" />
                 </View>
-                <Text style={[styles.statValue, { color: Colors.text }]}>{stat.value}</Text>
-                <Text style={[styles.statLabel, { color: Colors.textSecondary }]}>{stat.label}</Text>
+                <View style={styles.goalDetails}>
+                  <Text style={styles.goalText}>
+                    {readingStats.totalMinutesRead || 0} / {currentUser?.preferences?.readingGoal || 30} dakika
+                  </Text>
+                  <Text style={styles.goalSubtext}>Günlük okuma hedefiniz</Text>
+                </View>
               </View>
-            ))}
+              
+              <View style={styles.goalBarContainer}>
+                <View style={styles.goalBar}>
+                  <View 
+                    style={[
+                      styles.goalFill, 
+                      { 
+                        width: `${Math.min(
+                          ((readingStats.totalMinutesRead || 0) / (currentUser?.preferences?.readingGoal || 30)) * 100, 
+                          100
+                        )}%` 
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Recommended Books Section */}
+        <View style={styles.section}>
+          <View style={styles.recommendedSection}>
+            <View style={styles.recommendedHeader}>
+              <View style={styles.recommendedIcon}>
+                <MaterialCommunityIcons name="star-circle" size={28} color="#fff" />
+              </View>
+              <Text style={styles.recommendedTitle}>📖 Önerilen Kitaplar</Text>
+            </View>
+
+            <View style={styles.recommendedGrid}>
+              <View style={styles.recommendedRow}>
+                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}>
+                  <MaterialCommunityIcons name="trending-up" size={24} color="#007AFF" />
+                  <Text style={styles.recommendedCardTitle}>Popüler</Text>
+                  <Text style={styles.recommendedCardDesc}>En çok okunan kitaplar</Text>
+                </View>
+
+                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
+                  <MaterialCommunityIcons name="account-heart" size={24} color="#4CAF50" />
+                  <Text style={styles.recommendedCardTitle}>Size Özel</Text>
+                  <Text style={styles.recommendedCardDesc}>Okuma geçmişinize göre</Text>
+                </View>
+              </View>
+
+              <View style={styles.recommendedRow}>
+                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+                  <MaterialCommunityIcons name="crown" size={24} color="#8B5CF6" />
+                  <Text style={styles.recommendedCardTitle}>Editörün Seçimi</Text>
+                  <Text style={styles.recommendedCardDesc}>Uzmanların önerileri</Text>
+                </View>
+
+                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(255, 184, 0, 0.1)' }]}>
+                  <MaterialCommunityIcons name="clock-fast" size={24} color="#FFB800" />
+                  <Text style={styles.recommendedCardTitle}>Hızlı Okuma</Text>
+                  <Text style={styles.recommendedCardDesc}>Kısa ve etkileyici</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.comingSoonBanner}>
+              <MaterialCommunityIcons name="rocket-launch" size={20} color="#FF6B6B" />
+              <Text style={styles.comingSoonText}>
+                Kişiselleştirilmiş kitap önerileri yakında geliyor! 🚀
+              </Text>
+            </View>
           </View>
         </View>
+        
+        {/* Bottom spacing */}
+        <View style={styles.bottomSpacing} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -356,392 +433,423 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FAFAFA',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.headerBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: Spacing.lg,
+    backgroundColor: '#007AFF',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
   },
   headerContent: {
     flex: 1,
   },
   greeting: {
     fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
-    marginBottom: 2,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+    marginBottom: 4,
   },
   appName: {
-    fontSize: FontSizes.xxl,
+    fontSize: FontSizes.xl,
     fontWeight: '700',
-    color: Colors.text,
+    color: '#fff',
   },
-  settingsButton: {
+  profileButton: {
     padding: Spacing.sm,
-    marginTop: -Spacing.xs,
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+  },
+  profileButtonInner: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: Spacing.sm,
   },
   scrollView: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingBottom: Spacing.xxl,
   },
   section: {
-    marginBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    shadowColor: Colors.shadowMedium,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
   },
   sectionTitle: {
     fontSize: FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.text,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
+    fontWeight: '700',
+    color: '#2C3E50',
     marginBottom: Spacing.md,
   },
-  progressCard: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    shadowColor: Colors.shadowMedium,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 15,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-  },
-  progressHeader: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.sectionBackground,
-  },
-  currentlyReadingLabel: {
-    fontSize: FontSizes.xs,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  progressContent: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    backgroundColor: Colors.cardBackground,
-  },
-  bookCoverContainer: {
-    width: 60,
-    height: 80,
-    borderRadius: BorderRadius.sm,
-    overflow: 'hidden',
-    marginRight: Spacing.md,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: Colors.borderSoft,
-  },
-  bookCover: {
-    width: '100%',
-    height: '100%',
-  },
-  bookDetails: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  bookTitle: {
-    fontSize: FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: Spacing.xs,
-  },
-  bookAuthor: {
-    fontSize: FontSizes.md,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-  },
-  pageInfo: {
-    fontSize: FontSizes.sm,
-    color: Colors.textTertiary,
-  },
-  progressSection: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    backgroundColor: Colors.cardBackground,
-  },
-  progressInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  progressPercentage: {
-    fontSize: FontSizes.sm,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  progressBarContainer: {},
-  progressBar: {
-    height: 6,
-    backgroundColor: Colors.progressBackground,
-    borderRadius: BorderRadius.sm,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.sm,
-  },
-  updatesContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
-  },
-  updateCard: {
-    backgroundColor: Colors.warm,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  updateContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatarContainer: {
-    marginRight: Spacing.md,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: Colors.borderLight,
-  },
-  updateTextContainer: {
-    flex: 1,
-  },
-  updateText: {
-    fontSize: FontSizes.sm,
-    lineHeight: 18,
-    marginBottom: Spacing.xs,
-  },
-  partnerName: {
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  updateActivity: {
-    color: Colors.textSecondary,
-  },
-  updateTime: {
-    fontSize: FontSizes.xs,
-    color: Colors.textTertiary,
-  },
-  heartButton: {
-    padding: Spacing.xs,
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: BorderRadius.full,
-  },
-  quickActionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
-  },
-  quickActionCard: {
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: Spacing.sm,
-    backgroundColor: Colors.coolGray,
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  quickActionText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '500',
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  statisticsContainer: {
+  statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
+    marginTop: -20, // Overlap with header
+    marginBottom: Spacing.xl,
+    gap: Spacing.md,
   },
   statCard: {
-    backgroundColor: Colors.coolGray,
-    borderRadius: BorderRadius.md,
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     padding: Spacing.lg,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: Spacing.xs,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  middleStatCard: {
-    marginHorizontal: Spacing.sm,
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.sm,
-    shadowColor: Colors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 3,
   },
   statValue: {
     fontSize: FontSizes.xl,
     fontWeight: '700',
-    color: Colors.text,
+    color: '#2C3E50',
     marginBottom: Spacing.xs,
   },
   statLabel: {
-    fontSize: FontSizes.xs,
-    color: Colors.textSecondary,
+    fontSize: FontSizes.sm,
+    color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 14,
+    fontWeight: '500',
   },
-  emptyStateCard: {
-    flex: 1,
+  progressCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  progressContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bookCoverContainer: {
+    position: 'relative',
+    marginRight: Spacing.lg,
+  },
+  bookCover: {
+    width: 80,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  progressOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.lg,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: BorderRadius.sm,
+  },
+  progressText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  bookDetails: {
+    flex: 1,
+  },
+  bookTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: Spacing.xs,
+  },
+  bookAuthor: {
+    fontSize: FontSizes.md,
+    color: '#6B7280',
+    marginBottom: Spacing.sm,
+  },
+  pageInfo: {
+    fontSize: FontSizes.sm,
+    color: '#9CA3AF',
+    marginBottom: Spacing.md,
+  },
+  progressBarContainer: {
+    marginBottom: Spacing.sm,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 4,
+  },
+  emptyStateCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xxl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  emptyStateIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0F8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
   },
   emptyStateTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: Colors.text,
+    color: '#2C3E50',
     marginBottom: Spacing.md,
+    textAlign: 'center',
   },
   emptyStateText: {
     fontSize: FontSizes.md,
-    color: Colors.textSecondary,
+    color: '#6B7280',
     textAlign: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
+    lineHeight: 22,
   },
   emptyStateButton: {
-    padding: Spacing.md,
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    borderRadius: 16,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.sm,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   emptyStateButtonText: {
-    fontSize: FontSizes.sm,
+    fontSize: FontSizes.md,
     fontWeight: '700',
-    color: Colors.text,
-    textAlign: 'center',
+    color: '#fff',
   },
-  emptyUpdatesCard: {
-    flex: 1,
+  goalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  goalProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  goalIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.lg,
+    marginRight: Spacing.lg,
   },
-  emptyUpdatesTitle: {
+  goalDetails: {
+    flex: 1,
+  },
+  goalText: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: Colors.text,
+    color: '#2C3E50',
+    marginBottom: Spacing.xs,
+  },
+  goalSubtext: {
+    fontSize: FontSizes.sm,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  goalBarContainer: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  goalBar: {
+    height: '100%',
+    width: '100%',
+  },
+  goalFill: {
+    height: '100%',
+    backgroundColor: '#4ECDC4',
+    borderRadius: 4,
+  },
+  addButton: {
+    padding: Spacing.sm,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+  },
+  bottomSpacing: {
+    height: Spacing.xxl,
+  },
+  recommendedSection: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  recommendedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  recommendedIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0F8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.lg,
+  },
+  recommendedTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#2C3E50',
+  },
+  recommendedGrid: {
+    marginBottom: Spacing.xl,
+  },
+  recommendedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: Spacing.md,
   },
-  emptyUpdatesText: {
+  recommendedCard: {
+    width: '48%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  recommendedCardTitle: {
     fontSize: FontSizes.md,
-    color: Colors.textSecondary,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
     textAlign: 'center',
+  },
+  recommendedCardDesc: {
+    fontSize: FontSizes.sm,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  comingSoonBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: Spacing.lg,
+    marginTop: Spacing.sm,
+  },
+  comingSoonText: {
+    fontSize: FontSizes.md,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginLeft: Spacing.sm,
+  },
+  partnerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  partnerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F0F8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: Spacing.lg,
+  },
+  partnerTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  partnerSubtitle: {
+    fontSize: FontSizes.md,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  partnerButton: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+  },
+  partnerButtonText: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
 
