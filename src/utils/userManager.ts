@@ -102,8 +102,12 @@ export class UserManager {
     try {
       console.log('🔐 UserManager: Attempting authentication for:', email);
       
+      const apiUrl = getApiUrl(API_CONFIG.ENDPOINTS.AUTH.LOGIN);
+      console.log('🌐 API URL:', apiUrl);
+      console.log('📝 Request body:', { email: email.trim(), password: '***' });
+      
       // API çağrısı yap
-      const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.AUTH.LOGIN), {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -113,6 +117,7 @@ export class UserManager {
       });
 
       console.log('📡 API Response status:', response.status);
+      console.log('📡 API Response headers:', response.headers);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -140,6 +145,7 @@ export class UserManager {
 
       // JWT token'ı AsyncStorage'a kaydet
       await AsyncStorage.setItem('bookmate_auth_token', data.token);
+      console.log('💾 Token saved to AsyncStorage');
       
       // User'ı local storage'a kaydet
       await this.saveUser(user);
@@ -150,6 +156,7 @@ export class UserManager {
       
     } catch (error) {
       console.error('❌ Authentication error:', error);
+      console.error('❌ Error details:', error.message, error.stack);
       return null;
     }
   }

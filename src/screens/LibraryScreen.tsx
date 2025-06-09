@@ -22,6 +22,7 @@ import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 // import { loadBooks, setBooks } from '../store/bookSlice'; // Geçici olarak devre dışı
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import APIService, { UserBook } from '../utils/apiService';
+import { setCurrentUser } from '../store/bookSlice';
 
 const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void; viewMode: string }) => {
   const [imageLoading, setImageLoading] = useState(true);
@@ -244,6 +245,33 @@ const LibraryScreen = () => {
         }
       } else {
         console.log('❌ Failed to load books:', result.message);
+        
+        // Token geçersiz ise logout yap
+        if (result.message && result.message.includes('token')) {
+          console.log('🔑 Token geçersiz, logout yapılıyor...');
+          
+          // AsyncStorage'dan token'ı temizle
+          await AsyncStorage.removeItem('bookmate_auth_token');
+          await AsyncStorage.removeItem('user');
+          await AsyncStorage.removeItem('bookmate_current_session');
+          
+          // Redux state'i temizle
+          dispatch(setCurrentUser(null));
+          
+          // Login ekranına yönlendir
+          Alert.alert(
+            'Oturum Süresi Doldu',
+            'Güvenliğiniz için oturum süreniz sona erdi. Lütfen tekrar giriş yapın.',
+            [
+              {
+                text: 'Tamam',
+                onPress: () => navigation.navigate('Auth')
+              }
+            ]
+          );
+          return;
+        }
+        
         if (showLoading) {
           displayToast('error', `❌ Kitaplar yüklenemedi: ${result.message}`);
         }

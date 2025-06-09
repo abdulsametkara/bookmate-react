@@ -18,30 +18,31 @@ const MainTabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF', // iOS mavi rengi
-        tabBarInactiveTintColor: '#8E8E93', // iOS gri rengi
+        tabBarActiveTintColor: '#64FFDA', // Uzay teması ana rengi (cyan)
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.6)', // Şeffaf beyaz
         headerShown: true,
         tabBarStyle: {
           height: 88,
           paddingTop: 10,
           paddingBottom: 30,
+          backgroundColor: '#0F0F23', // Koyu uzay arka planı
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(100, 255, 218, 0.2)', // Cyan border
           ...Platform.select({
             ios: {
-              shadowColor: '#000',
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
+              shadowColor: '#64FFDA',
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
             },
             android: {
-              elevation: 10,
+              elevation: 15,
             },
           }),
-          borderTopWidth: 0.5,
-          borderTopColor: '#E5E5EA',
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '500',
-          marginTop: 1,
+          fontWeight: '600',
+          marginTop: 2,
         },
       }}
     >
@@ -74,6 +75,7 @@ const MainTabNavigator: React.FC = () => {
         component={ReadingTimerScreen}
         options={{
           title: 'Zamanlayıcı',
+          headerShown: false, // Kendi header tasarımımız olduğu için gizliyoruz
           tabBarIcon: ({ color, size }) => (
             <Icon name="timer-outline" color={color} size={size} />
           ),

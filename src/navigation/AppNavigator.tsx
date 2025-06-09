@@ -27,6 +27,7 @@ import BookScannerScreen from '../screens/BookScannerScreen';
 import ReadingListScreen from '../screens/ReadingListScreen';
 import StatsScreen from '../screens/StatsScreen';
 import BookShelf3DScreen from '../screens/BookShelf3DScreen';
+import ReadingStatsScreen from '../screens/ReadingStatsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -223,6 +224,11 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen 
               name="BookShelf3D" 
               component={BookShelf3DScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="ReadingStatsScreen" 
+              component={ReadingStatsScreen} 
               options={{ headerShown: false }}
             />
           </>

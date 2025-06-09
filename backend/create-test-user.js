@@ -6,60 +6,47 @@ const pool = new Pool({
   port: 5432,
   database: 'bookmate_db',
   user: 'postgres',
-  password: '246595'
+  password: '246595',
+  ssl: false,
 });
 
 async function createTestUser() {
   try {
-    // Test user data
-    const email = 'testuser123@gmail.com';
-    const password = '123456';
-    const displayName = 'Test User';
+    console.log('🔍 Creating test user: test123@gmail.com');
     
-    console.log(`🔍 Checking if user ${email} already exists...`);
-    const checkResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    // Check if user already exists
+    const existingUser = await pool.query(
+      'SELECT id, email FROM users WHERE email = $1',
+      ['test123@gmail.com']
+    );
     
-    if (checkResult.rows.length > 0) {
-      console.log(`ℹ️ User ${email} already exists, updating password...`);
-      
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      // Update user
-      await pool.query(
-        'UPDATE users SET password = $1 WHERE email = $2 RETURNING id, email, "displayName"',
-        [hashedPassword, email]
-      );
-      
-      console.log(`✅ User ${email} password updated successfully`);
-    } else {
-      console.log(`➕ Creating new user ${email}...`);
-      
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      // Insert user
-      const result = await pool.query(
-        'INSERT INTO users (email, password, "displayName") VALUES ($1, $2, $3) RETURNING id, email, "displayName"',
-        [email, hashedPassword, displayName]
-      );
-      
-      const user = result.rows[0];
-      console.log(`✅ User created successfully:`, user);
-      
-      // Create default user preferences
-      await pool.query(
-        'INSERT INTO user_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
-        [user.id]
-      );
+    if (existingUser.rows.length > 0) {
+      console.log('⚠️ User already exists:', existingUser.rows[0]);
+      return;
     }
     
-    console.log(`\n📝 Test user credentials:`);
-    console.log(`📧 Email: ${email}`);
-    console.log(`🔑 Password: ${password}`);
+    // Hash password
+    const password = '123456';
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Create user
+    const result = await pool.query(
+      'INSERT INTO users (email, password, "displayName") VALUES ($1, $2, $3) RETURNING id, email, "displayName", "createdAt"',
+      ['test123@gmail.com', hashedPassword, 'Test User']
+    );
+    
+    console.log('✅ User created successfully:', result.rows[0]);
+    
+    // Create default user preferences
+    await pool.query(
+      'INSERT INTO user_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
+      [result.rows[0].id]
+    );
+    
+    console.log('✅ User preferences created');
     
   } catch (error) {
-    console.error('❌ Error:', error.message);
+    console.error('💥 Error creating user:', error);
   } finally {
     await pool.end();
   }

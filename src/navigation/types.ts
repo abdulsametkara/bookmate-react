@@ -18,6 +18,7 @@ export type RootStackParamList = {
   BookDetailNew: { bookId: string };
   Stats: undefined;
   BookShelf3D: undefined;
+  ReadingStatsScreen: undefined;
 };
 
 // Auth stack navigator parametreleri

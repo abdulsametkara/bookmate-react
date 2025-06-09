@@ -287,6 +287,44 @@ class ReadingSessionManager {
       throw error;
     }
   }
+
+  // Get today's reading statistics
+  static async getTodayStats(userId: string): Promise<{
+    today: string;
+    todaySessions: ReadingSession[];
+    todaySessionsCount: number;
+    todayTotalSeconds: number;
+    todayTotalMinutes: number;
+  }> {
+    try {
+      const sessions = await this.getUserSessions(userId);
+      const today = new Date().toISOString().split('T')[0];
+      
+      const todaySessions = sessions.filter(session => 
+        session.date === today && session.endTime
+      );
+      
+      const todayTotalSeconds = todaySessions.reduce((sum, session) => sum + session.duration, 0);
+      const todayTotalMinutes = Math.round(todayTotalSeconds / 60);
+      
+      return {
+        today,
+        todaySessions,
+        todaySessionsCount: todaySessions.length,
+        todayTotalSeconds,
+        todayTotalMinutes
+      };
+    } catch (error) {
+      console.error('Error getting today stats:', error);
+      return {
+        today: new Date().toISOString().split('T')[0],
+        todaySessions: [],
+        todaySessionsCount: 0,
+        todayTotalSeconds: 0,
+        todayTotalMinutes: 0
+      };
+    }
+  }
 }
 
 export default ReadingSessionManager; 
