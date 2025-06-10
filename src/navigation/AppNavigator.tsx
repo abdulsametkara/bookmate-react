@@ -204,7 +204,7 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen 
               name="EditProfile" 
               component={EditProfileScreen} 
-              options={{ headerShown: true, title: 'Profili Düzenle' }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="BookScanner" 

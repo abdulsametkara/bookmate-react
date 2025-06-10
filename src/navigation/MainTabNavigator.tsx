@@ -18,24 +18,24 @@ const MainTabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#64FFDA', // Uzay teması ana rengi (cyan)
-        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.6)', // Şeffaf beyaz
+        tabBarActiveTintColor: '#007AFF', // Primary blue like library screen
+        tabBarInactiveTintColor: '#6B7280', // Gray for inactive icons
         headerShown: true,
         tabBarStyle: {
           height: 88,
           paddingTop: 10,
           paddingBottom: 30,
-          backgroundColor: '#0F0F23', // Koyu uzay arka planı
+          backgroundColor: '#FFFFFF', // Light background
           borderTopWidth: 1,
-          borderTopColor: 'rgba(100, 255, 218, 0.2)', // Cyan border
+          borderTopColor: 'rgba(0, 122, 255, 0.1)', // Light blue border
           ...Platform.select({
             ios: {
-              shadowColor: '#64FFDA',
-              shadowOpacity: 0.3,
+              shadowColor: '#000',
+              shadowOpacity: 0.1,
               shadowRadius: 8,
             },
             android: {
-              elevation: 15,
+              elevation: 8,
             },
           }),
         },
@@ -87,6 +87,7 @@ const MainTabNavigator: React.FC = () => {
         component={WishlistScreen}
         options={{
           title: 'İstek Listesi',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Icon name="heart-outline" color={color} size={size} />
           ),
@@ -98,6 +99,7 @@ const MainTabNavigator: React.FC = () => {
         component={ProfileScreen}
         options={{
           title: 'Profil',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Icon name="account-outline" color={color} size={size} />
           ),

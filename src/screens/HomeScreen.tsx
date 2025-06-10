@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -16,138 +16,71 @@ import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/core';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAppSelector, useAppDispatch } from '../store';
+import { useDispatch, useSelector } from 'react-redux';
+import { useAppSelector } from '../store';
 import UserManager, { User } from '../utils/userManager';
 import ReadingSessionManager, { ReadingStats } from '../utils/readingSessionManager';
 import { loadBooks, setBooks } from '../store/bookSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_CONFIG, getApiUrl, getAuthHeaders } from '../config/api';
+import { saveBooks } from '../utils/storageUtils';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = () => {
   const navigation = useNavigation();
-  const dispatch = useAppDispatch();
+  const dispatch = useDispatch();
   const currentUserId = useAppSelector((state) => state.books.currentUserId);
   const books = useAppSelector((state) => state.books.items);
+  const isLoading = useAppSelector((state) => state.books.loading);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [todayStats, setTodayStats] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Backend API'den kullanıcının kitaplarını yükle (tüm kitaplar)
-  const loadReadingBooksFromAPI = async () => {
-    if (!currentUserId) return;
-    
-    try {
-      console.log('📚 HomeScreen - Backend API\'den tüm kitaplar yükleniyor...');
-      // Tüm kitapları getir (sadece reading değil)
-      const APIService = (await import('../utils/apiService')).default;
-      const result = await APIService.getUserBooks(); // Tüm kitapları getir
-      
-      if (result.success && result.books) {
-        console.log('HomeScreen loading all books:', {
-          userId: currentUserId,
-          totalBooksCount: result.books.length,
-          books: result.books.map(b => ({ 
-            id: b.id, 
-            title: b.title, 
-            current_page: b.current_page,
-            page_count: b.page_count,
-            status: b.status 
-          }))
-        });
-        
-        // Backend UserBook'ları uygulama Book formatına çevir (tüm statuslar)
-        const convertedBooks = result.books.map(convertUserBookToBook);
-        
-        // Redux store'u güncelle - userId'ye göre filtrele ve güncellenmiş kitapları ekle
-        const otherUsersBooks = books.filter(b => b.userId !== currentUserId);
-        const updatedBooks = [...otherUsersBooks, ...convertedBooks];
-        
-        dispatch(setBooks(updatedBooks));
-      } else {
-        console.error('❌ Books loading failed:', result.message);
+  // Load books data
+  const loadBooksData = useCallback(async () => {
+    if (currentUserId) {
+      try {
+        const loadedBooks = await loadBooks(currentUserId);
+        dispatch(setBooks(loadedBooks));
+      } catch (error) {
+        console.error('Error loading books:', error);
       }
-    } catch (error) {
-      console.error('Error loading books in HomeScreen:', error);
     }
-  };
-  
-  // Backend UserBook'u uygulama Book modeline çevir
-  function convertUserBookToBook(userBook: any): any {
-    const currentPage = userBook.current_page || 0;
-    const progress = userBook.page_count > 0 ? 
-      Math.round((currentPage / userBook.page_count) * 100) : 0;
-
-    // Status mapping'i düzelt
-    let mappedStatus = 'TO_READ'; // default
-    const rawStatus = userBook.status?.toLowerCase();
-    
-    switch (rawStatus) {
-      case 'reading':
-        mappedStatus = 'READING';
-        break;
-      case 'completed':
-        mappedStatus = 'COMPLETED';
-        break;
-      case 'to_read':
-      case 'want_to_read':
-      case 'planned':
-        mappedStatus = 'TO_READ';
-        break;
-      case 'paused':
-      case 'on_hold':
-        mappedStatus = 'PAUSED';
-        break;
-      default:
-        console.warn(`⚠️ HomeScreen: Unknown status ${userBook.status}, defaulting to TO_READ`);
-        mappedStatus = 'TO_READ';
-    }
-
-    return {
-      id: userBook.id,
-      title: userBook.title,
-      author: userBook.author,
-      coverURL: userBook.cover_image_url || 'https://via.placeholder.com/200x300?text=Kapak+Yok',
-      pageCount: userBook.page_count || 0,
-      currentPage: currentPage,
-      progress: progress,
-      status: mappedStatus,
-      createdAt: new Date(userBook.createdAt).toISOString(),
-      notes: [],
-      genre: userBook.genre || 'Genel',
-      publishYear: new Date().getFullYear(),
-      publisher: 'Bilinmiyor',
-      description: '',
-      userId: currentUserId,
-    };
-  }
+  }, [currentUserId, dispatch]);
 
   // Load user data and reading stats
-  useEffect(() => {
-    const loadData = async () => {
-      if (currentUserId) {
-        try {
-          // Load user data
-          const user = await UserManager.getUserById(currentUserId);
-          setCurrentUser(user);
+  const loadUserData = useCallback(async () => {
+    if (currentUserId) {
+      try {
+        // Load user data
+        const user = await UserManager.getUserById(currentUserId);
+        setCurrentUser(user);
 
-          // Load reading statistics
-          const stats = await ReadingSessionManager.getUserStats(currentUserId);
-          setReadingStats(stats);
-        } catch (error) {
-          console.error('Error loading data:', error);
-        }
+        // Load reading statistics (total stats)
+        const stats = await ReadingSessionManager.getUserStats(currentUserId);
+        setReadingStats(stats);
+
+        // Load today's reading statistics
+        const todayData = await ReadingSessionManager.getTodayStats(currentUserId);
+        setTodayStats(todayData);
+      } catch (error) {
+        console.error('Error loading data:', error);
       }
-    };
-
-    loadData();
+    }
   }, [currentUserId]);
 
-  // Focus effect to reload books when screen comes into focus
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
+
+  // Focus effect to reload books and user data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadReadingBooksFromAPI();
-    }, [currentUserId])
+      loadBooksData();
+      loadUserData();
+    }, [currentUserId, loadBooksData, loadUserData])
   );
 
   // Calculate real statistics from books and reading sessions
@@ -167,7 +100,7 @@ const HomeScreen = () => {
   // Refresh functionality
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadReadingBooksFromAPI();
+    await loadBooksData();
     setRefreshing(false);
   }, []);
 
@@ -347,12 +280,12 @@ const HomeScreen = () => {
                 <View style={styles.goalIconContainer}>
                   <MaterialCommunityIcons name="target" size={24} color="#4ECDC4" />
                 </View>
-                <View style={styles.goalDetails}>
-                  <Text style={styles.goalText}>
-                    {readingStats.totalMinutesRead || 0} / {currentUser?.preferences?.readingGoal || 30} dakika
-                  </Text>
-                  <Text style={styles.goalSubtext}>Günlük okuma hedefiniz</Text>
-                </View>
+                                  <View style={styles.goalDetails}>
+                    <Text style={styles.goalText}>
+                     {todayStats?.todayTotalMinutes || 0} / {currentUser?.preferences?.readingGoal || 30} dakika
+                    </Text>
+                    <Text style={styles.goalSubtext}>Günlük okuma hedefiniz</Text>
+                  </View>
               </View>
               
               <View style={styles.goalBarContainer}>
@@ -360,12 +293,12 @@ const HomeScreen = () => {
                   <View 
                     style={[
                       styles.goalFill, 
-                      { 
-                        width: `${Math.min(
-                          ((readingStats.totalMinutesRead || 0) / (currentUser?.preferences?.readingGoal || 30)) * 100, 
-                          100
-                        )}%` 
-                      }
+                                              { 
+                          width: `${Math.min(
+                           ((todayStats?.todayTotalMinutes || 0) / (currentUser?.preferences?.readingGoal || 30)) * 100, 
+                           100
+                          )}%` 
+                        }
                     ]} 
                   />
                 </View>
@@ -401,15 +334,15 @@ const HomeScreen = () => {
 
               <View style={styles.recommendedRow}>
                 <View style={[styles.recommendedCard, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-                  <MaterialCommunityIcons name="crown" size={24} color="#8B5CF6" />
-                  <Text style={styles.recommendedCardTitle}>Editörün Seçimi</Text>
-                  <Text style={styles.recommendedCardDesc}>Uzmanların önerileri</Text>
+                  <MaterialCommunityIcons name="book-open-variant" size={24} color="#8B5CF6" />
+                  <Text style={styles.recommendedCardTitle}>Klasikler</Text>
+                  <Text style={styles.recommendedCardDesc}>Zamanın test ettiği eserler</Text>
                 </View>
 
                 <View style={[styles.recommendedCard, { backgroundColor: 'rgba(255, 184, 0, 0.1)' }]}>
-                  <MaterialCommunityIcons name="clock-fast" size={24} color="#FFB800" />
-                  <Text style={styles.recommendedCardTitle}>Hızlı Okuma</Text>
-                  <Text style={styles.recommendedCardDesc}>Kısa ve etkileyici</Text>
+                  <MaterialCommunityIcons name="star-outline" size={24} color="#FFB800" />
+                  <Text style={styles.recommendedCardTitle}>Yeni Çıkanlar</Text>
+                  <Text style={styles.recommendedCardDesc}>Son eklenen kitaplar</Text>
                 </View>
               </View>
             </View>
@@ -417,7 +350,7 @@ const HomeScreen = () => {
             <View style={styles.comingSoonBanner}>
               <MaterialCommunityIcons name="rocket-launch" size={20} color="#FF6B6B" />
               <Text style={styles.comingSoonText}>
-                Kişiselleştirilmiş kitap önerileri yakında geliyor! 🚀
+                Detaylı kitap önerileri ve kategoriler yakında geliyor! 🚀
               </Text>
             </View>
           </View>

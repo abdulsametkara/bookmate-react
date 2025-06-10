@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -9,15 +9,22 @@ import {
   Switch, 
   Modal,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Animated,
+  Dimensions,
+  Platform
 } from 'react-native';
 import { Text, TextInput, Surface, HelperText } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useAppSelector } from '../store';
 import UserManager, { User } from '../utils/userManager';
 import { FontSizes, Spacing, BorderRadius, Colors } from '../theme/theme';
 import CustomToast from '../components/CustomToast';
+
+const { width } = Dimensions.get('window');
 
 const EditProfileScreen = () => {
   const navigation = useNavigation();
@@ -48,6 +55,12 @@ const EditProfileScreen = () => {
   const [toastType, setToastType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
   const [toastMessage, setToastMessage] = useState('');
   
+  // Animation states
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const modalSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  
   // Hata state'leri
   const [errors, setErrors] = useState({
     name: false,
@@ -68,6 +81,27 @@ const EditProfileScreen = () => {
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 5000);
   };
+
+  // Entrance animations
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Kullanıcı verilerini yükle
   useEffect(() => {
@@ -311,25 +345,62 @@ const EditProfileScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#007AFF" barStyle="light-content" />
+    <View style={styles.containerFull}>
+      <StatusBar backgroundColor="#007AFF" barStyle="light-content" translucent={false} />
       
-      {/* Modern Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          disabled={saving}
+      {/* Blue Header with SafeArea */}
+      <SafeAreaView style={styles.blueHeaderContainer}>
+        <View style={styles.blueHeader}>
+          <Text style={styles.blueHeaderTitle}>Profili Düzenle</Text>
+          <TouchableOpacity 
+            style={styles.headerSaveButton}
+            onPress={handleSubmit}
+            disabled={saving}
+          >
+            {saving ? (
+              <MaterialCommunityIcons name="loading" size={20} color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="check" size={20} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+      
+      <ScrollView 
+        style={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Floating Back Button */}
+        <Animated.View
+          style={[
+            styles.floatingBackButton,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}></Text>
-        <View style={styles.headerRight} />
-      </View>
-
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity 
+            style={styles.backButtonContainer}
+            onPress={() => navigation.goBack()}
+            disabled={saving}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
+          </TouchableOpacity>
+        </Animated.View>
         {/* Modern Profil Fotoğrafı Bölümü */}
-        <Surface style={styles.profileSection}>
+        <Animated.View
+          style={[
+            styles.profileSection,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+              marginTop: 60, // Space for floating back button
+            }
+          ]}
+        >
+          <Surface style={styles.profileSectionInner}>
           <View style={styles.avatarContainer}>
             {renderAvatar()}
             <TouchableOpacity 
@@ -348,6 +419,7 @@ const EditProfileScreen = () => {
             <Text style={styles.changePhotoText}>Profil Fotoğrafını Değiştir</Text>
           </TouchableOpacity>
         </Surface>
+        </Animated.View>
 
         {/* Modern Kişisel Bilgiler Kartı */}
         <Surface style={styles.formSection}>
@@ -671,14 +743,18 @@ const EditProfileScreen = () => {
         message={toastMessage}
         onHide={() => setToastVisible(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#f5f5f5',
+  },
+  containerFull: {
+    flex: 1,
+    backgroundColor: '#007AFF',
   },
   loadingContainer: {
     flex: 1,
@@ -725,6 +801,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   profileSection: {
     backgroundColor: '#fff',
@@ -1087,6 +1164,146 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     marginLeft: Spacing.xs,
+  },
+  
+  // New Modern Styles
+  headerGradient: {
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  headerSafeArea: {
+    paddingBottom: Spacing.md,
+  },
+  modernBackButton: {
+    padding: Spacing.xs,
+  },
+  backButtonInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSubtitle: {
+    fontSize: FontSizes.sm,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  headerActionButton: {
+    padding: Spacing.xs,
+  },
+  saveButtonMini: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  saveButtonMiniDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  scrollContent: {
+    paddingBottom: Spacing.xxl,
+  },
+  profileSectionInner: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xxl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  
+  // Blue Header styles
+  blueHeaderContainer: {
+    backgroundColor: '#007AFF',
+  },
+  blueHeaderFull: {
+    backgroundColor: '#007AFF',
+  },
+  blueHeader: {
+    backgroundColor: '#007AFF',
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  blueHeaderTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSaveButton: {
+    position: 'absolute',
+    right: Spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  
+  // New floating styles
+  floatingBackButton: {
+    position: 'absolute',
+    top: Spacing.lg,
+    left: Spacing.lg,
+    zIndex: 10,
+  },
+  backButtonContainer: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  saveButtonFloat: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });
 

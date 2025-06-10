@@ -10,6 +10,7 @@ import {
 import { Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { useFocusEffect } from '@react-navigation/core';
 import type { RootState, AppDispatch } from '../store';
 import * as bookSliceActions from '../store/bookSlice';
 import UserManager, { User } from '../utils/userManager';
@@ -54,26 +55,36 @@ const UserProfile: React.FC<UserProfileProps> = ({
   };
 
   // Load user data and reading stats
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        if (currentUserId) {
-          const user = await UserManager.getUserById(currentUserId);
-          setCurrentUser(user);
+  const loadData = useCallback(async () => {
+    try {
+      if (currentUserId) {
+        const user = await UserManager.getUserById(currentUserId);
+        setCurrentUser(user);
 
-          // Load reading statistics
-          const stats = await ReadingSessionManager.getUserStats(currentUserId);
-          setReadingStats(stats);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-      } finally {
-        setLoading(false);
+        // Load reading statistics
+        const stats = await ReadingSessionManager.getUserStats(currentUserId);
+        setReadingStats(stats);
       }
-    };
-
-    loadData();
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [currentUserId]);
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Refresh data when screen comes into focus (after editing profile)
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUserId) {
+        loadData();
+      }
+    }, [currentUserId, loadData])
+  );
 
   // Calculate stats
   const userBooks = books.filter(book => book.userId === currentUserId);
@@ -233,28 +244,7 @@ const UserProfile: React.FC<UserProfileProps> = ({
         </View>
       </Surface>
 
-      {/* Additional Info Cards */}
-      {totalBooks > 0 && (
-        <Surface style={styles.additionalCard}>
-          <View style={styles.progressSection}>
-            <Text style={styles.progressTitle}>Okuma İlerlemesi</Text>
-            <View style={styles.progressStats}>
-              <View style={styles.progressItem}>
-                <Text style={styles.progressValue}>{completedBooks}</Text>
-                <Text style={styles.progressLabel}>Tamamlandı</Text>
-              </View>
-              <View style={styles.progressItem}>
-                <Text style={styles.progressValue}>{currentlyReading}</Text>
-                <Text style={styles.progressLabel}>Okunuyor</Text>
-              </View>
-              <View style={styles.progressItem}>
-                <Text style={styles.progressValue}>{totalBooks - completedBooks - currentlyReading}</Text>
-                <Text style={styles.progressLabel}>Bekliyor</Text>
-              </View>
-            </View>
-          </View>
-        </Surface>
-      )}
+
 
       {/* Info Section for Guest Users */}
       {isGuestUser && (

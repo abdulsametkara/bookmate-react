@@ -9,7 +9,8 @@ import {
   Text,
   TextInput,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  StatusBar
 } from 'react-native';
 import { Surface } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -477,9 +478,19 @@ const WishlistScreen = () => {
 
   return (
     <>
-      <SafeAreaView style={styles.container}>
-        {/* Modern Arama Kutusunu Üstte */}
-        <View style={styles.searchContainer}>
+      <View style={styles.containerFull}>
+        <StatusBar backgroundColor="#007AFF" barStyle="light-content" translucent={false} />
+        
+        {/* Blue Header */}
+        <SafeAreaView style={styles.blueHeaderContainer}>
+          <View style={styles.blueHeader}>
+            <Text style={styles.blueHeaderTitle}>İstek Listesi</Text>
+          </View>
+        </SafeAreaView>
+        
+        <SafeAreaView style={styles.container}>
+          {/* Modern Arama Kutusunu Üstte */}
+          <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <MaterialCommunityIcons name="magnify" size={20} color="#666666" style={styles.searchIcon} />
             <TextInput
@@ -542,55 +553,85 @@ const WishlistScreen = () => {
             )}
           </>
         )}
-      </SafeAreaView>
-      
-      {/* Search Results in Modal Layer */}
-      {showResults && (
-        <View style={styles.searchResultsOverlay}>
-          <View style={styles.searchResultsContainer}>
-            <View style={styles.searchResultsHeader}>
-              <Text style={styles.searchResultsTitle}>Arama Sonuçları</Text>
-              <TouchableOpacity onPress={() => setShowResults(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
+        </SafeAreaView>
+        
+        {/* Search Results in Modal Layer */}
+        {showResults && (
+          <View style={styles.searchResultsOverlay}>
+            <View style={styles.searchResultsContainer}>
+              <View style={styles.searchResultsHeader}>
+                <Text style={styles.searchResultsTitle}>Arama Sonuçları</Text>
+                <TouchableOpacity onPress={() => setShowResults(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={searchResults}
+                renderItem={renderSearchResult}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.searchResultsList}
+              />
             </View>
-            <FlatList
-              data={searchResults}
-              renderItem={renderSearchResult}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.searchResultsList}
-            />
           </View>
-        </View>
-      )}
-      
-      {/* Progress Modal */}
-      <ProgressModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        type={modalType}
-        title={modalTitle}
-        subtitle={modalSubtitle}
-        actionType={actionType}
-        onAction={handleModalAction}
-      />
-      
-      {/* Custom Toast */}
-      <CustomToast
-        visible={toastVisible}
-        type={toastType}
-        message={toastMessage}
-        onHide={() => setToastVisible(false)}
-      />
+        )}
+        
+        {/* Progress Modal */}
+        <ProgressModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          type={modalType}
+          title={modalTitle}
+          subtitle={modalSubtitle}
+          actionType={actionType}
+          onAction={handleModalAction}
+        />
+        
+        {/* Custom Toast */}
+        <CustomToast
+          visible={toastVisible}
+          type={toastType}
+          message={toastMessage}
+          onHide={() => setToastVisible(false)}
+        />
+      </View>
     </>
   );
 };
 
 const styles = StyleSheet.create({
+  containerFull: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#f5f5f5',
+  },
+  blueHeaderFull: {
+    backgroundColor: '#007AFF',
+  },
+  blueHeaderContainer: {
+    backgroundColor: '#007AFF',
+  },
+  blueHeader: {
+    backgroundColor: '#007AFF',
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  blueHeaderTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
   },
   searchContainer: {
     paddingHorizontal: Spacing.lg,

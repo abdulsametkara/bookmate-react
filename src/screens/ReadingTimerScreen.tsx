@@ -73,6 +73,8 @@ const ReadingTimerScreen = () => {
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
   const [todayMinutes, setTodayMinutes] = useState(0);
   
+
+  
   // Book selection state
   const [selectedBook, setSelectedBook] = useState(null);
   const [showBookSelectionModal, setShowBookSelectionModal] = useState(false);
@@ -99,9 +101,11 @@ const ReadingTimerScreen = () => {
 
   // Pulse animation for running timer
   useEffect(() => {
+    let animationRef = null;
+    
     if (isRunning && !isPaused) {
       const startPulse = () => {
-        Animated.sequence([
+        animationRef = Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.05,
             duration: 1000,
@@ -112,12 +116,15 @@ const ReadingTimerScreen = () => {
             duration: 1000,
             useNativeDriver: true,
           }),
-        ]).start(() => {
-          if (isRunning && !isPaused) {
+        ]);
+        
+        animationRef.start(({ finished }) => {
+          if (finished && isRunning && !isPaused) {
             startPulse();
           }
         });
       };
+      
       startPulse();
     } else {
       Animated.timing(pulseAnim, {
@@ -126,13 +133,21 @@ const ReadingTimerScreen = () => {
         useNativeDriver: true,
       }).start();
     }
-  }, [isRunning, isPaused]);
+    
+    return () => {
+      if (animationRef) {
+        animationRef.stop();
+      }
+    };
+  }, [isRunning, isPaused, pulseAnim]);
 
   // Dot pulse animation
   useEffect(() => {
+    let dotAnimationRef = null;
+    
     if (isRunning && !isPaused) {
       const startDotPulse = () => {
-        Animated.sequence([
+        dotAnimationRef = Animated.sequence([
           Animated.timing(dotPulseAnim, {
             toValue: 1.5,
             duration: 800,
@@ -143,12 +158,15 @@ const ReadingTimerScreen = () => {
             duration: 800,
             useNativeDriver: true,
           }),
-        ]).start(() => {
-          if (isRunning && !isPaused) {
+        ]);
+        
+        dotAnimationRef.start(({ finished }) => {
+          if (finished && isRunning && !isPaused) {
             startDotPulse();
           }
         });
       };
+      
       startDotPulse();
     } else {
       Animated.timing(dotPulseAnim, {
@@ -157,12 +175,20 @@ const ReadingTimerScreen = () => {
         useNativeDriver: true,
       }).start();
     }
-  }, [isRunning, isPaused]);
+    
+    return () => {
+      if (dotAnimationRef) {
+        dotAnimationRef.stop();
+      }
+    };
+  }, [isRunning, isPaused, dotPulseAnim]);
 
   // Subtitle fade animation
   useEffect(() => {
+    let subtitleAnimationRef = null;
+    
     const startSubtitleFade = () => {
-      Animated.sequence([
+      subtitleAnimationRef = Animated.sequence([
         Animated.timing(subtitleFadeAnim, {
           toValue: 0.7,
           duration: 2000,
@@ -173,10 +199,23 @@ const ReadingTimerScreen = () => {
           duration: 2000,
           useNativeDriver: true,
         }),
-      ]).start(() => startSubtitleFade());
+      ]);
+      
+      subtitleAnimationRef.start(({ finished }) => {
+        if (finished) {
+          startSubtitleFade();
+        }
+      });
     };
+    
     startSubtitleFade();
-  }, []);
+    
+    return () => {
+      if (subtitleAnimationRef) {
+        subtitleAnimationRef.stop();
+      }
+    };
+  }, [subtitleFadeAnim]);
 
   // Load timer state from AsyncStorage
   const loadTimerState = async () => {
@@ -299,9 +338,14 @@ const ReadingTimerScreen = () => {
   
   useEffect(() => {
     if (currentUserId && !isAppStateChanging) {
-      saveTimerState();
+      // Use timeout to prevent rapid state updates
+      const timeoutId = setTimeout(() => {
+        saveTimerState();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [sessionSeconds, isRunning, isPaused, currentSessionId, selectedBook, isAppStateChanging]);
+  }, [sessionSeconds, isRunning, isPaused, currentSessionId, selectedBook?.id, isAppStateChanging]);
 
   // Handle app state changes
   useEffect(() => {
@@ -509,11 +553,11 @@ const ReadingTimerScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <StatusBar barStyle="dark-content" backgroundColor="#007AFF" />
       
-      {/* Background Gradient - Space-like */}
+      {/* Background Gradient - Light theme like library screen */}
       <LinearGradient
-        colors={['#0F0F23', '#1A1A2E', '#16213E', '#0F3460', '#001122']}
+        colors={['#007AFF', '#4A90E2', '#64B5F6', '#90CAF9', '#BBDEFB']}
         locations={[0, 0.25, 0.5, 0.75, 1]}
         style={StyleSheet.absoluteFillObject}
       />
@@ -521,7 +565,7 @@ const ReadingTimerScreen = () => {
       {/* Header */}
       <SafeAreaView style={styles.headerSafeArea}>
         <LinearGradient
-          colors={['rgba(15, 15, 35, 0.95)', 'rgba(26, 26, 46, 0.9)', 'rgba(15, 52, 96, 0.85)']}
+          colors={['rgba(0, 122, 255, 0.95)', 'rgba(74, 144, 226, 0.9)', 'rgba(100, 181, 246, 0.85)']}
           style={styles.headerGradient}
         >
           <Animated.View 
@@ -537,7 +581,7 @@ const ReadingTimerScreen = () => {
             style={styles.modernBackButton}
             onPress={() => navigation.goBack()}
           >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#007AFF" />
           </TouchableOpacity>
           
           <View style={styles.headerCenter}>
@@ -551,7 +595,7 @@ const ReadingTimerScreen = () => {
             style={styles.modernStatsButton}
             onPress={goToStats}
           >
-            <MaterialCommunityIcons name="chart-line" size={24} color="#FFFFFF" />
+            <MaterialCommunityIcons name="chart-line" size={24} color="#007AFF" />
           </TouchableOpacity>
         </Animated.View>
         </LinearGradient>
@@ -577,7 +621,7 @@ const ReadingTimerScreen = () => {
         >
           <TouchableOpacity onPress={selectBook} style={styles.bookCardContent}>
             <LinearGradient
-              colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
+              colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.8)']}
               style={styles.bookCardGradient}
             >
               {selectedBook ? (
@@ -599,7 +643,7 @@ const ReadingTimerScreen = () => {
                       {selectedBook.author}
                     </Text>
                     <View style={styles.changeBookContainer}>
-                      <MaterialCommunityIcons name="swap-horizontal" size={16} color="#64FFDA" />
+                      <MaterialCommunityIcons name="swap-horizontal" size={16} color="#007AFF" />
                       <Text style={styles.changeBookText}>Kitap Değiştir</Text>
                     </View>
                   </View>
@@ -607,7 +651,7 @@ const ReadingTimerScreen = () => {
               ) : (
                 <View style={styles.noBookContainer}>
                   <View style={styles.noBookIcon}>
-                    <MaterialCommunityIcons name="book-plus" size={48} color="#64FFDA" />
+                    <MaterialCommunityIcons name="book-plus" size={48} color="#007AFF" />
                   </View>
                   <Text style={styles.noBookTitle}>Kitap Seçin</Text>
                   <Text style={styles.noBookSubtitle}>
@@ -619,75 +663,110 @@ const ReadingTimerScreen = () => {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Clean Timer Card */}
-        <Animated.View style={[styles.newTimerContainer, {
+        {/* Modern Circular Timer Display */}
+        <Animated.View style={[styles.circularTimerContainer, {
           opacity: fadeAnim,
-          transform: [{ translateY: fadeAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [50, 0]
-          }) }]
+          transform: [
+            { scale: pulseAnim },
+            { translateY: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0]
+              })
+            }
+          ]
         }]}>
           
-          {/* Timer Card */}
-          <Animated.View style={[styles.timerCard, {
-            transform: [{ scale: pulseAnim }]
-          }]}>
+          {/* Outer Progress Circle */}
+          <Animated.View style={[styles.outerProgressRing, {
+            borderColor: isRunning && !isPaused ? '#007AFF' : 
+                       isPaused ? '#FF9800' : '#9CA3AF',
+            shadowColor: isRunning && !isPaused ? '#007AFF' : 
+                       isPaused ? '#FF9800' : '#9CA3AF',
+            transform: [{ rotate: `${(sessionSeconds % 60) * 6}deg` }]
+          }]} />
+          
+          {/* Inner Progress Circle */}
+          <Animated.View style={[styles.innerProgressRing, {
+            borderColor: isRunning && !isPaused ? 'rgba(0, 122, 255, 0.3)' : 
+                       isPaused ? 'rgba(255, 152, 0, 0.3)' : 'rgba(156, 163, 175, 0.2)',
+            transform: [{ rotate: `${(sessionSeconds % 3600) / 60 * 360}deg` }]
+          }]} />
+          
+          {/* Main Circular Container */}
+          <LinearGradient
+            colors={
+              isRunning && !isPaused 
+                ? ['rgba(255, 255, 255, 0.95)', 'rgba(240, 248, 255, 0.9)', 'rgba(219, 234, 254, 0.85)']
+                : isPaused 
+                ? ['rgba(255, 255, 255, 0.95)', 'rgba(255, 251, 235, 0.9)', 'rgba(254, 243, 199, 0.85)']
+                : ['rgba(255, 255, 255, 0.95)', 'rgba(249, 250, 251, 0.9)', 'rgba(243, 244, 246, 0.85)']
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.circularTimerBase}
+          >
             
-            {/* Card Background Gradient */}
-            <LinearGradient
-              colors={[
-                'rgba(16, 33, 62, 0.9)',
-                'rgba(15, 52, 96, 0.8)',
-                'rgba(26, 26, 46, 0.9)'
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.timerCardGradient}
-            />
-            
-            {/* Modern Space Timer Content */}
-            <View style={styles.spaceTimerContent}>
+            {/* Central Timer Content */}
+            <View style={styles.timerCenterContent}>
               
-              {/* Modern Glassmorphism Timer */}
-              <Animated.View style={[styles.modernTimerBox, {
-                transform: [{ scale: pulseAnim }]
+              {/* Large Time Display */}
+              <Text style={[styles.circularTimerText, {
+                color: isRunning && !isPaused ? '#007AFF' : 
+                      isPaused ? '#FF9800' : '#6B7280'
               }]}>
-                {/* Glassmorphism Background */}
-                <LinearGradient
-                  colors={[
-                    'rgba(255, 255, 255, 0.12)',
-                    'rgba(255, 255, 255, 0.06)'
-                  ]}
-                  style={styles.glassTimerGradient}
-                >
-                  <Text style={[styles.ultraModernTime, {
-                    color: isRunning && !isPaused ? '#FFFFFF' : 
-                           isPaused ? '#FFD93D' : '#B8BCC8'
-                  }]}>
-                    {Math.floor(sessionSeconds / 3600).toString().padStart(2, '0')}:
-                    {Math.floor((sessionSeconds % 3600) / 60).toString().padStart(2, '0')}:
-                    {(sessionSeconds % 60).toString().padStart(2, '0')}
-                  </Text>
-                </LinearGradient>
-                
-                {/* Subtle Status Indicator */}
-                <Animated.View style={[styles.subtleStatusIndicator, {
-                  backgroundColor: isRunning && !isPaused ? '#00E676' : 
-                                 isPaused ? '#FFD93D' : '#6C7B7F',
+                {Math.floor(sessionSeconds / 3600).toString().padStart(2, '0')}:
+                {Math.floor((sessionSeconds % 3600) / 60).toString().padStart(2, '0')}:
+                {(sessionSeconds % 60).toString().padStart(2, '0')}
+              </Text>
+              
+              {/* Minimal Status Indicator */}
+              <View style={styles.minimalStatusContainer}>
+                <Animated.View style={[styles.statusDot, {
+                  backgroundColor: isRunning && !isPaused ? '#4CAF50' : 
+                                 isPaused ? '#FF9800' : '#9CA3AF',
                   transform: [{ scale: dotPulseAnim }]
                 }]} />
-              </Animated.View>
+                <Text style={[styles.statusLabel, {
+                  color: isRunning && !isPaused ? '#007AFF' : 
+                        isPaused ? '#FF9800' : '#6B7280'
+                }]}>
+                  {!isRunning ? 'Beklemede' : isPaused ? 'Duraklatıldı' : 'Aktif'}
+                </Text>
+              </View>
               
             </View>
             
+          </LinearGradient>
+          
+          {/* Floating Center Icon */}
+          <Animated.View style={[styles.centerIcon, {
+            opacity: pulseAnim.interpolate({
+              inputRange: [0.8, 1],
+              outputRange: [0.6, 1]
+            })
+          }]}>
+            <MaterialCommunityIcons 
+              name="book-open-variant" 
+              size={24} 
+              color={isRunning && !isPaused ? '#007AFF' : 
+                    isPaused ? '#FF9800' : '#9CA3AF'} 
+            />
           </Animated.View>
+          
+          {/* Timer Label */}
+          <View style={styles.circularTimerLabel}>
+            <Text style={[styles.labelText, {
+              color: isRunning && !isPaused ? '#007AFF' : 
+                    isPaused ? '#FF9800' : '#6B7280'
+            }]}></Text>
+          </View>
           
         </Animated.View>
 
-        {/* Controls Section */}
+        {/* Professional Controls Section */}
         <Animated.View 
           style={[
-            styles.modernTimerCard,
+            styles.professionalControlsCard,
             {
               opacity: fadeAnim,
               transform: [{ translateY: fadeAnim.interpolate({
@@ -697,69 +776,56 @@ const ReadingTimerScreen = () => {
             }
           ]}
         >
-          <LinearGradient
-            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-            style={styles.timerCardGradient}
-          >
-            {/* Control Buttons */}
-            <View style={styles.modernControlsContainer}>
-              <TouchableOpacity 
-                style={[styles.modernControlButton, styles.modernStopButton]}
-                onPress={stopTimer}
-                disabled={sessionSeconds === 0}
-              >
-                <LinearGradient
-                  colors={sessionSeconds === 0 ? ['#424242', '#616161'] : ['#F44336', '#D32F2F']}
-                  style={styles.controlButtonGradient}
-                >
-                  <MaterialCommunityIcons 
-                    name="stop" 
-                    size={20} 
-                    color={sessionSeconds === 0 ? '#9E9E9E' : '#FFFFFF'} 
-                  />
-                  <Text style={[styles.modernControlText, {
-                    color: sessionSeconds === 0 ? '#9E9E9E' : '#FFFFFF'
-                  }]}>
-                    Kaydet & Durdur
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modernControlButton, styles.modernMainButton]}
-                onPress={() => {
-                  if (!isRunning) {
-                    startTimer();
-                  } else if (isPaused) {
-                    resumeTimer();
-                  } else {
-                    pauseTimer();
-                  }
-                }}
-              >
-                <LinearGradient
-                  colors={!isRunning ? ['#4CAF50', '#388E3C'] : 
-                         isPaused ? ['#2196F3', '#1976D2'] : ['#FF9800', '#F57C00']}
-                  style={styles.controlButtonGradient}
-                >
-                  <MaterialCommunityIcons 
-                    name={!isRunning ? 'play' : isPaused ? 'play' : 'pause'} 
-                    size={20} 
-                    color="#FFFFFF" 
-                  />
-                  <Text style={styles.modernControlText}>
-                    {!isRunning ? 'Başla' : isPaused ? 'Devam Et' : 'Duraklat'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
+          {/* Control Buttons */}
+          <View style={styles.controlsContainer}>
+            <TouchableOpacity 
+              style={[styles.controlButton, styles.stopButton, {
+                opacity: sessionSeconds === 0 ? 0.5 : 1
+              }]}
+              onPress={stopTimer}
+              disabled={sessionSeconds === 0}
+            >
+              <MaterialCommunityIcons 
+                name="stop" 
+                size={20} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlButtonText}>
+                Kaydet & Durdur
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.controlButton, styles.mainButton, {
+                backgroundColor: !isRunning ? '#4CAF50' : 
+                               isPaused ? '#2196F3' : '#FF9800'
+              }]}
+              onPress={() => {
+                if (!isRunning) {
+                  startTimer();
+                } else if (isPaused) {
+                  resumeTimer();
+                } else {
+                  pauseTimer();
+                }
+              }}
+            >
+              <MaterialCommunityIcons 
+                name={!isRunning ? 'play' : isPaused ? 'play' : 'pause'} 
+                size={20} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlButtonText}>
+                {!isRunning ? 'Başla' : isPaused ? 'Devam Et' : 'Duraklat'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
 
-        {/* Statistics Card */}
+        {/* Professional Statistics Section */}
         <Animated.View 
           style={[
-            styles.modernStatsCard,
+            styles.professionalStatsCard,
             {
               opacity: fadeAnim,
               transform: [{ translateY: fadeAnim.interpolate({
@@ -769,69 +835,58 @@ const ReadingTimerScreen = () => {
             }
           ]}
         >
-          <LinearGradient
-            colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
-            style={styles.statsCardGradient}
-          >
-            <View style={styles.modernStatsHeader}>
-              <MaterialCommunityIcons name="chart-arc" size={24} color="#64FFDA" />
-              <Text style={styles.modernStatsTitle}>Okuma İstatistikleri</Text>
+          {/* Stats Header */}
+          <View style={styles.statsHeaderSection}>
+            <MaterialCommunityIcons name="chart-arc" size={24} color="#007AFF" />
+            <Text style={styles.statsHeaderTitle}>Okuma İstatistikleri</Text>
+          </View>
+          
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            {/* Current Session */}
+            <View style={styles.statCard}>
+              <View style={[styles.statIconContainer, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}>
+                <MaterialCommunityIcons name="timer-outline" size={20} color="#007AFF" />
+              </View>
+              <Text style={styles.statLabel}>Bu Oturum</Text>
+              <Text style={[styles.statValue, { color: '#007AFF' }]}>{currentTime.formatted}</Text>
             </View>
             
-            <View style={styles.modernStatsGrid}>
-              <View style={styles.modernStatItem}>
-                <LinearGradient
-                  colors={['rgba(100, 255, 218, 0.2)', 'rgba(100, 255, 218, 0.1)']}
-                  style={styles.statItemGradient}
-                >
-                  <MaterialCommunityIcons name="timer-outline" size={24} color="#64FFDA" />
-                  <Text style={styles.modernStatLabel}>Bu Oturum</Text>
-                  <Text style={styles.modernStatValue}>{currentTime.formatted}</Text>
-                </LinearGradient>
+            {/* Today Total */}
+            <View style={styles.statCard}>
+              <View style={[styles.statIconContainer, { backgroundColor: 'rgba(33, 150, 243, 0.1)' }]}>
+                <MaterialCommunityIcons name="calendar-today" size={20} color="#2196F3" />
               </View>
-              
-              <View style={styles.modernStatItem}>
-                <LinearGradient
-                  colors={['rgba(33, 150, 243, 0.2)', 'rgba(33, 150, 243, 0.1)']}
-                  style={styles.statItemGradient}
-                >
-                  <MaterialCommunityIcons name="calendar-today" size={24} color="#2196F3" />
-                  <Text style={styles.modernStatLabel}>Bugün Toplam</Text>
-                  <Text style={styles.modernStatValue}>{todayTime.formatted}</Text>
-                </LinearGradient>
-              </View>
+              <Text style={styles.statLabel}>Bugün</Text>
+              <Text style={[styles.statValue, { color: '#2196F3' }]}>{todayTime.formatted}</Text>
             </View>
-
-            <View style={styles.modernStatsGrid}>
-              <View style={styles.modernStatItem}>
-                <LinearGradient
-                  colors={['rgba(76, 175, 80, 0.2)', 'rgba(76, 175, 80, 0.1)']}
-                  style={styles.statItemGradient}
-                >
-                  <MaterialCommunityIcons name="book-multiple" size={24} color="#4CAF50" />
-                  <Text style={styles.modernStatLabel}>Genel Toplam</Text>
-                  <Text style={styles.modernStatValue}>
-                    {readingStats ? formatTime(readingStats.totalSecondsRead).formatted : '00:00:00'}
-                  </Text>
-                </LinearGradient>
+          </View>
+          
+          <View style={styles.statsGrid}>
+            {/* Total */}
+            <View style={styles.statCard}>
+              <View style={[styles.statIconContainer, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
+                <MaterialCommunityIcons name="book-multiple" size={20} color="#4CAF50" />
               </View>
-              
-              <View style={styles.modernStatItem}>
-                <LinearGradient
-                  colors={['rgba(255, 152, 0, 0.2)', 'rgba(255, 152, 0, 0.1)']}
-                  style={styles.statItemGradient}
-                >
-                  <MaterialCommunityIcons name="chart-line" size={24} color="#FF9800" />
-                  <Text style={styles.modernStatLabel}>Ortalama/Gün</Text>
-                  <Text style={styles.modernStatValue}>
-                    {readingStats && readingStats.totalSessions > 0 
-                      ? formatTime(readingStats.averageSessionDuration).formatted 
-                      : '00:00:00'}
-                  </Text>
-                </LinearGradient>
-              </View>
+              <Text style={styles.statLabel}>Toplam</Text>
+              <Text style={[styles.statValue, { color: '#4CAF50' }]}>
+                {readingStats ? formatTime(readingStats.totalSecondsRead).formatted : '00:00:00'}
+              </Text>
             </View>
-          </LinearGradient>
+            
+            {/* Average */}
+            <View style={styles.statCard}>
+              <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255, 152, 0, 0.1)' }]}>
+                <MaterialCommunityIcons name="chart-line" size={20} color="#FF9800" />
+              </View>
+              <Text style={styles.statLabel}>Ortalama</Text>
+              <Text style={[styles.statValue, { color: '#FF9800' }]}>
+                {readingStats && readingStats.totalSessions > 0 
+                  ? formatTime(readingStats.averageSessionDuration).formatted 
+                  : '00:00:00'}
+              </Text>
+            </View>
+          </View>
         </Animated.View>
       </ScrollView>
 
@@ -844,7 +899,7 @@ const ReadingTimerScreen = () => {
       >
         <View style={styles.modernModalContainer}>
           <LinearGradient
-            colors={['#1a1a2e', '#16213e']}
+            colors={['#F5F7FA', '#FFFFFF']}
             style={StyleSheet.absoluteFillObject}
           />
           
@@ -855,7 +910,7 @@ const ReadingTimerScreen = () => {
                 style={styles.modernModalCloseButton}
                 onPress={() => setShowBookSelectionModal(false)}
               >
-                <MaterialCommunityIcons name="close" size={24} color="#FFFFFF" />
+                <MaterialCommunityIcons name="close" size={24} color="#007AFF" />
               </TouchableOpacity>
             </View>
             
@@ -907,11 +962,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.5)',
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   headerCenter: {
     flex: 1,
@@ -922,21 +982,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   modernHeaderSubtitle: {
     fontSize: FontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   modernStatsButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.5)',
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   scrollView: {
     flex: 1,
@@ -995,12 +1066,12 @@ const styles = StyleSheet.create({
   modernBookTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1F2937',
     marginBottom: 4,
   },
   modernBookAuthor: {
     fontSize: FontSizes.md,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#6B7280',
     marginBottom: 8,
   },
   changeBookContainer: {
@@ -1009,7 +1080,7 @@ const styles = StyleSheet.create({
   },
   changeBookText: {
     fontSize: FontSizes.sm,
-    color: '#64FFDA',
+    color: '#007AFF',
     marginLeft: 4,
     fontWeight: '600',
   },
@@ -1023,397 +1094,163 @@ const styles = StyleSheet.create({
   noBookTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1F2937',
     marginBottom: 8,
   },
   noBookSubtitle: {
     fontSize: FontSizes.md,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#6B7280',
     textAlign: 'center',
   },
-  modernTimerCard: {
-    marginBottom: Spacing.xl,
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 8,
+  professionalTimerCard: {
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: Spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.1)',
   },
-
-  modernTimerDisplay: {
+  timerDisplayWrapper: {
+    alignItems: 'center',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: Spacing.lg,
   },
-  timeDisplayContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-
-  modernStatusSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.xl,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  statusIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  modernStatusText: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  
-  // New Futuristic Timer Styles
-  futuristicTimerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: Spacing.lg,
-    aspectRatio: 1.2,
-    minHeight: 320,
-    position: 'relative',
-  },
-  glowingCircle: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(100, 255, 218, 0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(100, 255, 218, 0.3)',
-    shadowColor: '#64FFDA',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  timerContentWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    width: '100%',
-    height: '100%',
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    backgroundColor: 'rgba(100, 255, 218, 0.1)',
-    shadowColor: '#64FFDA',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  giantTimerWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 40,
-  },
-  gradientTextMask: {
-    borderRadius: 15,
-    padding: 20,
-  },
-  giantTimerText: {
-    fontSize: 72,
-    fontWeight: Platform.OS === 'ios' ? '100' : '100',
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-    letterSpacing: 4,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 12,
-  },
-  subtitleContainer: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  modernSubtitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
-    letterSpacing: 2,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    textShadowColor: 'rgba(100, 255, 218, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  progressDots: {
-    flexDirection: 'row',
-    marginTop: 15,
-    alignItems: 'center',
-  },
-  progressDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#64FFDA',
-    marginHorizontal: 4,
-    shadowColor: '#64FFDA',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  
-  // Modern Rectangular Timer Styles
-  newTimerContainer: {
-    marginVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-  },
-  timerCard: {
-    position: 'relative',
-    borderRadius: 16,
-    overflow: 'hidden',
-    minHeight: 120,
-    paddingVertical: Spacing.lg,
-  },
-  timerCardGradient: {
-    flex: 1,
-    padding: Spacing.lg,
-  },
-  glowBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    shadowColor: 'currentColor',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  timerCardContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    position: 'relative',
-    zIndex: 1,
-  },
-  // Modern Space Timer Styles
-  spaceTimerContent: {
-    flex: 1,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.lg,
-  },
-  glowingRing: {
-    position: 'absolute',
-    width: '95%',
-    height: '90%',
-    borderRadius: 16,
-    borderWidth: 2,
-    backgroundColor: 'transparent',
+  statusDotWrapper: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: Spacing.sm,
     shadowColor: 'currentColor',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  timerDisplayContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timerGlowBackground: {
-    position: 'absolute',
-    width: '90%',
-    height: '80%',
-    borderRadius: 12,
-  },
-  timeUnitsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  timeUnit: {
-    alignItems: 'center',
-    marginHorizontal: Spacing.xs,
-  },
-  timeNumber: {
-    fontSize: 36,
-    fontWeight: Platform.OS === 'ios' ? '300' : '300',
-    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-  },
-  timeLabel: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.6)',
-    letterSpacing: 1,
-    marginTop: 2,
-    textTransform: 'uppercase',
-  },
-  timeSeparator: {
-    fontSize: 32,
-    fontWeight: '200',
-    marginHorizontal: Spacing.xs,
-    opacity: 0.8,
-  },
-  modernStatusIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: 'currentColor',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.5,
     shadowRadius: 4,
     elevation: 3,
   },
-  statusPulse: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  statusText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  mainTimerSection: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  newTimerText: {
-    fontSize: 42,
-    fontWeight: Platform.OS === 'ios' ? '200' : '200',
-    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    textAlign: 'center',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  modernControlsContainer: {
-    gap: Spacing.md,
-    paddingTop: Spacing.md,
-  },
-  modernControlButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 6,
+
+  professionalControlsCard: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: Spacing.xl,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.1)',
   },
-  modernStopButton: {
-    marginBottom: Spacing.sm,
+  controlsContainer: {
+    gap: Spacing.md,
   },
-  modernMainButton: {
-    // Ana buton için özel style
-  },
-  controlButtonGradient: {
+  controlButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.xl,
+    borderRadius: 16,
     gap: Spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  modernControlText: {
+  stopButton: {
+    backgroundColor: '#F44336',
+    marginBottom: Spacing.sm,
+  },
+  mainButton: {
+    // Dynamic backgroundColor applied inline
+  },
+  controlButtonText: {
     fontSize: FontSizes.md,
     fontWeight: '700',
+    color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  modernStatsCard: {
+  professionalStatsCard: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 8,
+    padding: Spacing.xl,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.1)',
   },
-  statsCardGradient: {
-    padding: Spacing.xl,
-  },
-  modernStatsHeader: {
+  statsHeaderSection: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
-  modernStatsTitle: {
+  statsHeaderTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1F2937',
     marginLeft: Spacing.sm,
   },
-  modernStatsGrid: {
+  statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: Spacing.md,
     gap: Spacing.sm,
   },
-  modernStatItem: {
+  statCard: {
     flex: 1,
+    backgroundColor: '#F8F9FA',
     borderRadius: 16,
-    overflow: 'hidden',
-  },
-  statItemGradient: {
-    padding: Spacing.lg,
+    padding: Spacing.md,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  modernStatLabel: {
-    fontSize: FontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xs,
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  statLabel: {
+    fontSize: FontSizes.xs,
+    color: '#6B7280',
     fontWeight: '600',
     textAlign: 'center',
+    marginBottom: Spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  modernStatValue: {
-    fontSize: FontSizes.md,
+  statValue: {
+    fontSize: FontSizes.sm,
     fontWeight: '700',
-    color: '#FFFFFF',
     textAlign: 'center',
   },
   modernModalContainer: {
@@ -1429,22 +1266,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#FFFFFF',
   },
   modernModalTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1F2937',
   },
   modernModalCloseButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.5)',
+    borderColor: 'rgba(0, 122, 255, 0.3)',
   },
   modernBooksList: {
     padding: Spacing.lg,
@@ -1454,10 +1292,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.lg,
     marginBottom: Spacing.md,
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: 'rgba(0, 122, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   bookItemCover: {
     width: 60,
@@ -1476,188 +1319,127 @@ const styles = StyleSheet.create({
   bookItemTitle: {
     fontSize: FontSizes.md,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1F2937',
     marginBottom: 4,
   },
   bookItemAuthor: {
     fontSize: FontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#6B7280',
     marginBottom: 8,
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // Modern Timer Display Styles
-  unifiedTimeDisplay: {
+  modernStatusText: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  
+  // Modern Circular Timer Styles
+  circularTimerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    shadowColor: '#64FFDA',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
-    minHeight: 140,
-    aspectRatio: 2.8,
-    overflow: 'hidden',
+    marginVertical: Spacing.xl,
+    width: 280,
+    height: 280,
+    position: 'relative',
+    alignSelf: 'center',
   },
-  statusIndicatorRow: {
+  outerProgressRing: {
     position: 'absolute',
-    top: Spacing.md,
-    right: Spacing.md,
-    zIndex: 1,
-  },
-  modernStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-    shadowColor: 'currentColor',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    borderWidth: 4,
+    borderColor: '#007AFF',
+    backgroundColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderBottomColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 20,
+    elevation: 15,
   },
-  mainTimerContainer: {
+  innerProgressRing: {
+    position: 'absolute',
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'transparent',
+    top: 10,
+    left: 10,
+  },
+  circularTimerBase: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 25,
+    elevation: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    margin: 30,
+  },
+  timerCenterContent: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
   },
-  mainTimerText: {
-    fontSize: 48,
-    fontWeight: '300',
-    color: '#FFFFFF',
-    letterSpacing: 3,
+  circularTimerText: {
+    fontSize: 36,
+    fontWeight: Platform.OS === 'ios' ? '600' : '700',
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+    letterSpacing: 2,
     textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto Light',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    marginBottom: Spacing.sm,
   },
-  timerLabelContainer: {
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-  },
-  timerMainLabel: {
-    fontSize: FontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
-    textAlign: 'center',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-
-  // Modern Digital Timer Styles
-  modernTimerDisplayContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
+  minimalStatusContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.xl,
-  },
-  modernTimerBackground: {
-    position: 'absolute',
-    width: '95%',
-    height: '85%',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  digitalTimeContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.xxl,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 12,
-    minHeight: 80,
-  },
-  modernDigitalTime: {
-    fontSize: 42,
-    fontWeight: Platform.OS === 'ios' ? '300' : '300',
-    fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'monospace',
-    letterSpacing: 3,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   statusDot: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    shadowColor: 'currentColor',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-
-  // Modern Glassmorphism Timer Styles
-  modernTimerBox: {
-    alignSelf: 'center',
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 12,
-    position: 'relative',
-    // iOS specific blur
-    ...(Platform.OS === 'ios' && {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    }),
-  },
-  glassTimerGradient: {
-    paddingVertical: 24,
-    paddingHorizontal: 32,
-    minWidth: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-  },
-  ultraModernTime: {
-    fontSize: 32,
-    fontWeight: Platform.OS === 'ios' ? '200' : '200',
-    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto Thin',
-    letterSpacing: 1.5,
-    textAlign: 'center',
-    // Subtle text shadow for depth
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  subtleStatusIndicator: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    shadowColor: 'currentColor',
-    shadowOffset: { width: 0, height: 0 },
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  statusLabel: {
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  centerIcon: {
+    position: 'absolute',
+    top: 40,
+    alignSelf: 'center',
+    zIndex: 1,
+  },
+  circularTimerLabel: {
+    position: 'absolute',
+    bottom: -45,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  labelText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '700',
+    letterSpacing: 3,
+    textAlign: 'center',
   },
 });
 
