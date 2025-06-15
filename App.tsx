@@ -9,6 +9,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import store from './src/store';
 import RecommendationManager from './src/utils/recommendationManager';
 import { ToastProvider } from './src/providers/ToastProvider';
+import { validateApiKeys } from './src/utils/apiConfig';
 
 export default function App() {
   useEffect(() => {
@@ -16,6 +17,12 @@ export default function App() {
     const initializeApp = async () => {
       try {
         console.log('🚀 App başlatılıyor...');
+        
+        // API anahtarlarını kontrol et
+        const apiKeysValid = validateApiKeys();
+        if (!apiKeysValid) {
+          console.error('❌ API anahtarları yüklenemedi! .env dosyasını kontrol edin.');
+        }
         
         // Clear all caches for fresh start
         await AsyncStorage.removeItem('book_covers_cache');

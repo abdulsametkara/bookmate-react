@@ -29,6 +29,7 @@
     "dotenv": "^16.5.0",
     "expo": "~53.0.9",
     "expo-blur": "~14.1.4",
+    "expo-constants": "^17.1.6",
     "expo-image": "~2.1.7",
     "expo-linear-gradient": "~14.1.5",
     "expo-status-bar": "~2.2.3",
