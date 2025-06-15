@@ -40,8 +40,6 @@
       "eas": {
         "projectId": "13360e4e-4d23-4374-bc21-164f0211a046"
       },
-      "openaiApiKey": "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",
-      "googleBooksApiKey": "AIzaSyDGjT8uE7YR6RbZkHhNnL7iQwCpQr8MfBg",
       "useDemoMode": false,
       "openaiModel": "gpt-3.5-turbo",
       "maxTokens": 1000,
