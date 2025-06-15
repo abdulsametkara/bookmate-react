@@ -28,6 +28,20 @@ import ReadingListScreen from '../screens/ReadingListScreen';
 import StatsScreen from '../screens/StatsScreen';
 import BookShelf3DScreen from '../screens/BookShelf3DScreen';
 import ReadingStatsScreen from '../screens/ReadingStatsScreen';
+import BookRecommendationsScreen from '../screens/BookRecommendationsScreen';
+
+// Shared Reading screens
+import SharedReadingScreen from '../screens/SharedReadingScreen';
+import PartnerSearchScreen from '../screens/PartnerSearchScreen';
+import FriendRequestsScreen from '../screens/FriendRequestsScreen';
+import StartSharedReadingScreen from '../screens/StartSharedReadingScreen';
+import SharedReadingSessionScreen from '../screens/SharedReadingSessionScreen';
+import SharedReadingMessagesScreen from '../screens/SharedReadingMessagesScreen';
+import FriendProfileScreen from '../screens/FriendProfileScreen';
+import SharedLibrariesScreen from '../screens/SharedLibrariesScreen';
+import CreateSharedLibraryScreen from '../screens/CreateSharedLibraryScreen';
+import SharedLibraryDetailScreen from '../screens/SharedLibraryDetailScreen';
+import SelectBooksForLibraryScreen from '../screens/SelectBooksForLibraryScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -230,6 +244,90 @@ const AppNavigator: React.FC = () => {
               name="ReadingStatsScreen" 
               component={ReadingStatsScreen} 
               options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="BookRecommendations" 
+              component={BookRecommendationsScreen} 
+              options={{ headerShown: false }}
+            />
+            
+            {/* Shared Reading Screens */}
+            <Stack.Screen 
+              name="SharedReading" 
+              component={SharedReadingScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="PartnerSearch" 
+              component={PartnerSearchScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="FriendRequests" 
+              component={FriendRequestsScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="StartSharedReading" 
+              component={StartSharedReadingScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="SharedReadingSession" 
+              component={SharedReadingSessionScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="SharedReadingMessages" 
+              component={SharedReadingMessagesScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="FriendProfile" 
+              component={FriendProfileScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="SharedLibraries" 
+              component={SharedLibrariesScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="CreateSharedLibrary" 
+              component={CreateSharedLibraryScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="SharedLibraryDetail" 
+              component={SharedLibraryDetailScreen} 
+              options={{ 
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="SelectBooksForLibrary" 
+              component={SelectBooksForLibraryScreen} 
+              options={{ 
+                headerShown: false
+              }}
             />
           </>
         ) : (

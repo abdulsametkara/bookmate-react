@@ -5,46 +5,36 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key-here",
+        "USE_DEMO_MODE": "true",
+        "NODE_ENV": "development"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key-here",
+        "USE_DEMO_MODE": "false",
+        "NODE_ENV": "production"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "OPENAI_API_KEY": "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",
+        "USE_DEMO_MODE": "false",
+        "NODE_ENV": "production"
       }
     }
   },
   "submit": {
     "production": {}
   }
-} 
- 
-  "cli": {
-    "version": ">= 5.2.0"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "production": {
-      "android": {
-        "buildType": "app-bundle"
-      }
-    }
-  },
-  "submit": {
-    "production": {}
-  }
-} 
+}

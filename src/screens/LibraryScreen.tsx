@@ -23,6 +23,7 @@ import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import APIService, { UserBook } from '../utils/apiService';
 import { setCurrentUser } from '../store/bookSlice';
+import GoogleBooksService from '../services/googleBooksService';
 
 const BookItem = ({ book, onPress, viewMode }: { book: Book; onPress: () => void; viewMode: string }) => {
   const [imageLoading, setImageLoading] = useState(true);
@@ -197,6 +198,24 @@ const LibraryScreen = () => {
 
   const currentUserId = useSelector((state: RootState) => state.books.currentUserId);
 
+  // AsyncStorage'dan kitapları yükle
+  const loadBooksFromStorage = async () => {
+    if (!currentUserId) return;
+    
+    try {
+      const storageKey = `bookmate_books_${currentUserId}`;
+      const booksData = await AsyncStorage.getItem(storageKey);
+      
+      if (booksData) {
+        const storedBooks = JSON.parse(booksData);
+        console.log(`📦 Loading ${storedBooks.length} books from AsyncStorage`);
+        setBooks(storedBooks);
+      }
+    } catch (error) {
+      console.error('❌ Error loading books from AsyncStorage:', error);
+    }
+  };
+
   // Backend API'den kullanıcının kitaplarını yükle
   const loadBooksFromAPI = async (showLoading = false, force = false) => {
     if (!currentUserId) {
@@ -226,6 +245,12 @@ const LibraryScreen = () => {
       if (!token) {
         console.log('❌ No auth token found, books will not be synced with backend');
         displayToast('warning', '⚠️ Çevrimdışı modda çalışıyorsunuz');
+        
+        // Fix: Reset loading state even when there's no token
+        setIsLoadingBooks(false);
+        if (showLoading) {
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -238,6 +263,15 @@ const LibraryScreen = () => {
         const convertedBooks = result.books.map(convertUserBookToBook);
         setBooks(convertedBooks);
         setLastRefresh(Date.now());
+        
+        // 🔥 API'den yüklenen kitapları AsyncStorage'a kaydet
+        try {
+          const storageKey = `bookmate_books_${currentUserId}`;
+          await AsyncStorage.setItem(storageKey, JSON.stringify(convertedBooks));
+          console.log(`💾 Books saved to AsyncStorage: ${convertedBooks.length} books`);
+        } catch (error) {
+          console.error('❌ Error saving books to AsyncStorage:', error);
+        }
         
         // Show success message only for manual refresh
         if (showLoading) {
@@ -327,7 +361,7 @@ const LibraryScreen = () => {
       title: userBook.title || 'Başlıksız Kitap',
       author: userBook.author || 'Bilinmeyen Yazar',
       description: '',
-      coverURL: userBook.cover_image_url || 'https://via.placeholder.com/300x400?text=Kapak+Yok',
+                  coverURL: userBook.cover_image_url || GoogleBooksService.getFallbackCover(userBook.title || 'Kitap'),
       isbn: '',
       publisher: '',
       pageCount: pageCountNum,
@@ -365,6 +399,9 @@ const LibraryScreen = () => {
     const unsubscribe = navigation.addListener('focus', () => {
       console.log('👀 LibraryScreen focused');
       
+      // Her focus'ta AsyncStorage'dan güncel kitapları yükle
+      loadBooksFromStorage();
+      
       // BookDetail'den dönen parametreleri kontrol et
       const route = navigation.getState?.()?.routes?.find(r => r.name === 'Library');
       if (route?.params?.shouldRefresh) {
@@ -397,6 +434,14 @@ const LibraryScreen = () => {
       loadBooksFromAPI(true);
     }
   }, [currentUserId]); // Sadece currentUserId değiştiğinde
+
+  // Books yüklendiğinde loading state'ini sıfırla
+  React.useEffect(() => {
+    if (books.length > 0 && isLoading) {
+      console.log('📚 Books loaded, resetting loading state');
+      setIsLoading(false);
+    }
+  }, [books.length, isLoading]);
 
   // Book -> Redux Book dönüştürücü
   function convertBookToRedux(book: Book): any {

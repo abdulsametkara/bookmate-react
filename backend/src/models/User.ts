@@ -31,6 +31,17 @@ export default class User extends Model {
     allowNull: false,
     unique: true,
     validate: {
+      len: [3, 20],
+      is: /^[a-zA-Z0-9_]+$/
+    }
+  })
+  username!: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: false,
+    unique: true,
+    validate: {
       isEmail: true
     }
   })

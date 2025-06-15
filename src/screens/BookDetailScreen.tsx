@@ -31,6 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import APIService from '../utils/apiService';
 import ProgressModal from '../components/ProgressModal';
 import CustomToast from '../components/CustomToast';
+import GoogleBooksService from '../services/googleBooksService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -206,12 +207,20 @@ const BookDetailScreen = () => {
 
   // Update functions
   const updatePageNumber = async (newPage: number) => {
-    const pageNum = Math.max(0, Math.min(newPage, book.pageCount));
-    setCurrentPage(pageNum);
-    setPageInputText(pageNum.toString());
     triggerHaptic();
     
+    if (newPage < 0 || newPage > book.pageCount) {
+      displayToast('error', '❌ Geçersiz sayfa numarası');
+      return;
+    }
+
     try {
+      const pageNum = Math.round(newPage);
+      
+      // Update local state immediately for instant UI feedback
+      setCurrentPage(pageNum);
+      setPageInputText(pageNum.toString());
+      
       if (bookId) {
         await APIService.updateUserBook(bookId, {
           current_page: pageNum
@@ -222,15 +231,24 @@ const BookDetailScreen = () => {
         ...book,
         currentPage: pageNum,
         progress: book.pageCount > 0 ? (pageNum / book.pageCount) * 100 : 0,
-        coverURL: book.coverURL || 'https://via.placeholder.com/200x300?text=Kapak+Yok',
+        coverURL: book.coverURL || GoogleBooksService.getFallbackCover(book.title || 'Kitap'),
         createdAt: book.createdAt || new Date().toISOString(),
         userId: currentUserId || undefined,
-        notes: book.notes || []
+        notes: book.notes || [],
+        lastReadAt: new Date().toISOString() // Mark as recently read
       };
       
       dispatch(updateBook(bookUpdate));
+      
+      // Save to AsyncStorage immediately after Redux update
+      const allBooks = libraryBooks.map(b => b.id === book.id ? bookUpdate : b);
+      if (currentUserId) {
+        await saveBooks(allBooks, currentUserId);
+      }
+      
       displayToast('success', '📖 Sayfa güncellendi!');
     } catch (error) {
+      console.error('Page update error:', error);
       displayToast('error', '❌ Güncelleme başarısız');
     }
   };
@@ -274,15 +292,22 @@ const BookDetailScreen = () => {
       const bookUpdate = {
         ...book,
         status: storeStatus,
-        coverURL: book.coverURL || 'https://via.placeholder.com/200x300?text=Kapak+Yok',
+        coverURL: book.coverURL || GoogleBooksService.getFallbackCover(book.title || 'Kitap'),
         createdAt: book.createdAt || new Date().toISOString(),
         userId: currentUserId || undefined,
         currentPage: book.currentPage || currentPage,
         progress: book.progress || 0,
-        notes: book.notes || []
+        notes: book.notes || [],
+        lastReadAt: new Date().toISOString() // Mark as recently read
       };
       
       dispatch(updateBook(bookUpdate));
+      
+      // Save to AsyncStorage immediately after Redux update
+      const allBooks = libraryBooks.map(b => b.id === book.id ? bookUpdate : b);
+      if (currentUserId) {
+        await saveBooks(allBooks, currentUserId);
+      }
       
       if (status === BookStatus.COMPLETED) {
         setShowProgressModal(true);
@@ -641,7 +666,11 @@ const BookDetailScreen = () => {
                 
                 <TouchableOpacity 
                   style={[styles.pageInputButton, { backgroundColor: statusInfo.color }]}
-                  onPress={() => updatePageNumber(Math.min(book.pageCount, currentPage + 1))}
+                  onPress={() => {
+                    const nextPage = Math.min(book.pageCount, currentPage + 1);
+                    console.log('Plus button pressed:', { currentPage, nextPage, bookPageCount: book.pageCount });
+                    updatePageNumber(nextPage);
+                  }}
                   activeOpacity={0.8}
                 >
                   <MaterialCommunityIcons name="plus" size={20} color="#fff" />

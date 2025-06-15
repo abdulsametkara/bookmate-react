@@ -1,85 +1,58 @@
 import React, { useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Animated, 
-  TouchableOpacity,
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
   Dimensions,
-  Platform,
-  StatusBar
+  TouchableOpacity,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
 export interface ToastProps {
-  visible: boolean;
   message: string;
-  type?: 'success' | 'error' | 'warning' | 'info';
-  duration?: number;
+  type: 'success' | 'error' | 'warning' | 'info';
+  visible: boolean;
   onHide: () => void;
-  action?: {
-    label: string;
-    onPress: () => void;
-  };
+  duration?: number;
 }
 
 const CustomToast: React.FC<ToastProps> = ({
-  visible,
   message,
-  type = 'info',
-  duration = 3000,
+  type,
+  visible,
   onHide,
-  action
+  duration = 3000,
 }) => {
+  const slideAnim = useRef(new Animated.Value(-100)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(-100)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.8)).current;
-  const iconScale = useRef(new Animated.Value(0)).current;
-  const iconRotate = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
     if (visible) {
-      // Show animation with spring effect
+      // Show animation
       Animated.parallel([
-        Animated.spring(translateY, {
+        Animated.spring(slideAnim, {
           toValue: 0,
+          useNativeDriver: true,
           tension: 100,
           friction: 8,
-          useNativeDriver: true,
         }),
-        Animated.timing(opacity, {
+        Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 300,
           useNativeDriver: true,
         }),
-        Animated.spring(scale, {
+        Animated.spring(scaleAnim, {
           toValue: 1,
+          useNativeDriver: true,
           tension: 100,
           friction: 8,
-          useNativeDriver: true,
         }),
       ]).start();
-
-      // Icon animation
-      setTimeout(() => {
-        Animated.parallel([
-          Animated.spring(iconScale, {
-            toValue: 1,
-            tension: 150,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-          Animated.timing(iconRotate, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }, 100);
 
       // Auto hide after duration
       const timer = setTimeout(() => {
@@ -92,20 +65,21 @@ const CustomToast: React.FC<ToastProps> = ({
 
   const hideToast = () => {
     Animated.parallel([
-      Animated.timing(translateY, {
+      Animated.timing(slideAnim, {
         toValue: -100,
-        duration: 300,
+        duration: 250,
         useNativeDriver: true,
       }),
-      Animated.timing(opacity, {
+      Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 300,
+        duration: 250,
         useNativeDriver: true,
       }),
-      Animated.timing(scale, {
+      Animated.spring(scaleAnim, {
         toValue: 0.8,
-        duration: 300,
         useNativeDriver: true,
+        tension: 100,
+        friction: 8,
       }),
     ]).start(() => {
       onHide();
@@ -116,204 +90,127 @@ const CustomToast: React.FC<ToastProps> = ({
     switch (type) {
       case 'success':
         return {
-          backgroundColor: '#10B981',
-          borderColor: '#059669',
-          icon: 'check-circle',
-          iconColor: '#FFFFFF',
+          colors: ['#10B981', '#059669'] as const,
+          icon: 'checkmark-circle',
           shadowColor: '#10B981',
-          iconBackground: '#0D9488',
         };
       case 'error':
         return {
-          backgroundColor: '#EF4444',
-          borderColor: '#DC2626',
-          icon: 'alert-circle',
-          iconColor: '#FFFFFF',
+          colors: ['#EF4444', '#DC2626'] as const,
+          icon: 'close-circle',
           shadowColor: '#EF4444',
-          iconBackground: '#DC2626',
         };
       case 'warning':
         return {
-          backgroundColor: '#F59E0B',
-          borderColor: '#D97706',
-          icon: 'alert',
-          iconColor: '#FFFFFF',
+          colors: ['#F59E0B', '#D97706'] as const,
+          icon: 'warning',
           shadowColor: '#F59E0B',
-          iconBackground: '#D97706',
         };
-      default:
+      case 'info':
         return {
-          backgroundColor: '#3B82F6',
-          borderColor: '#2563EB',
-          icon: 'information',
-          iconColor: '#FFFFFF',
+          colors: ['#3B82F6', '#2563EB'] as const,
+          icon: 'information-circle',
           shadowColor: '#3B82F6',
-          iconBackground: '#2563EB',
         };
     }
   };
 
   const config = getToastConfig();
 
-  const rotateInterpolate = iconRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
   if (!visible) return null;
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ translateY }, { scale }],
-          opacity,
-        },
-      ]}
-    >
-      <View style={[
-        styles.toastContainer,
-        {
-          backgroundColor: config.backgroundColor,
-          borderColor: config.borderColor,
-          shadowColor: config.shadowColor,
-        }
-      ]}>
-        {/* Content */}
-        <View style={styles.content}>
-          <Animated.View 
+    <View style={styles.container}>
+      <Animated.View
+        style={[
+          styles.toastWrapper,
+          {
+            transform: [
+              { translateY: slideAnim },
+              { scale: scaleAnim },
+            ],
+            opacity: fadeAnim,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={hideToast} activeOpacity={0.9}>
+          <LinearGradient
+            colors={config.colors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
             style={[
-              styles.iconContainer,
+              styles.toast,
               {
-                backgroundColor: config.iconBackground,
-                transform: [
-                  { scale: iconScale },
-                  { rotate: type === 'warning' ? rotateInterpolate : '0deg' }
-                ]
-              }
+                shadowColor: config.shadowColor,
+              },
             ]}
           >
-            <MaterialCommunityIcons
-              name={config.icon as any}
-              size={24}
-              color={config.iconColor}
-            />
-          </Animated.View>
-          <View style={styles.textContainer}>
-            <Text style={styles.title}>{message}</Text>
-          </View>
-          {action && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={action.onPress}
-              activeOpacity={0.7}
+            <View style={styles.iconContainer}>
+              <Ionicons 
+                name={config.icon as any} 
+                size={24} 
+                color="white" 
+              />
+            </View>
+            
+            <Text style={styles.message} numberOfLines={3}>
+              {message}
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={hideToast}
+              style={styles.closeButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.actionText}>{action.label}</Text>
+              <Ionicons name="close" size={18} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={hideToast}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons
-              name="close"
-              size={18}
-              color="rgba(255, 255, 255, 0.8)"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Animated.View>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight! + 10,
+    top: 60,
     left: 0,
     right: 0,
-    alignItems: 'center',
-    zIndex: 9998,
-    elevation: 19,
-    pointerEvents: 'box-none',
+    zIndex: 9999,
+    paddingHorizontal: 16,
   },
-  toastContainer: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 20,
+  toastWrapper: {
+    width: '100%',
   },
-  content: {
+  toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    minHeight: 64,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-    shadowColor: '#000',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    marginHorizontal: 4,
   },
-  textContainer: {
+  iconContainer: {
+    marginRight: 12,
+  },
+  message: {
     flex: 1,
-    marginRight: Spacing.sm,
-  },
-  title: {
-    fontSize: FontSizes.md,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: 'white',
     lineHeight: 20,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  actionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: 20,
-    marginRight: Spacing.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  actionText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginLeft: 8,
+    padding: 4,
   },
 });
 

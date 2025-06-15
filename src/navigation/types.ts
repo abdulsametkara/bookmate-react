@@ -10,7 +10,7 @@ export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
   BookDetail: { bookId: string };
-  ReadingTimer: { bookId: string };
+  ReadingTimer: { bookId?: string; sharedSessionId?: string };
   EditBook: { bookId?: string }; // undefined ise yeni kitap
   EditProfile: undefined;
   BookScanner: undefined;
@@ -19,6 +19,23 @@ export type RootStackParamList = {
   Stats: undefined;
   BookShelf3D: undefined;
   ReadingStatsScreen: undefined;
+  BookRecommendations: { 
+    category: 'popular' | 'personalized' | 'classics' | 'new';
+    title: string;
+  };
+  // Ortak Okuma Ekranları
+  SharedReading: undefined;
+  PartnerSearch: undefined;
+  FriendRequests: undefined;
+  SharedReadingSession: { sessionId: string };
+  SharedReadingMessages: { sessionId: string };
+  FriendProfile: { friendId: string };
+  SharedLibraries: undefined;
+  SharedLibraryDetail: { libraryId: string };
+  SelectBooksForLibrary: { libraryId: string; onBooksSelected?: () => void };
+  CreateSharedLibrary: undefined;
+  SharedBookNotes: { libraryId: string; bookId: string };
+  StartSharedReading: { partnerId?: string };
 };
 
 // Auth stack navigator parametreleri

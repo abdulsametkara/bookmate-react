@@ -155,6 +155,67 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// 🔍 Kitap var mı kontrol et (ISBN ile)
+router.post('/check-or-create', authenticateToken, async (req, res) => {
+  try {
+    const {
+      title,
+      author,
+      isbn,
+      publisher,
+      published_year,
+      page_count,
+      genre,
+      description,
+      cover_image_url,
+      language = 'tr'
+    } = req.body;
+    
+    if (!title || !author) {
+      return res.status(400).json({ message: 'Başlık ve yazar alanları zorunludur' });
+    }
+    
+    let book;
+    
+    // ISBN varsa önce ISBN ile kontrol et
+    if (isbn) {
+      const existingBook = await pool.query('SELECT * FROM books WHERE isbn = $1', [isbn]);
+      if (existingBook.rows.length > 0) {
+        book = existingBook.rows[0];
+        console.log('📚 Existing book found by ISBN:', book.title);
+        return res.json({
+          message: 'Kitap zaten sistemde mevcut',
+          book,
+          isExisting: true
+        });
+      }
+    }
+    
+    // Kitap yoksa oluştur
+    const result = await pool.query(`
+      INSERT INTO books (title, author, isbn, publisher, "publishedYear", "pageCount", genre, description, cover_image_url, language)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *
+    `, [title, author, isbn, publisher, published_year, page_count, genre, description, cover_image_url, language]);
+    
+    book = result.rows[0];
+    console.log('📚 New book created:', book.title);
+    
+    res.status(201).json({
+      message: 'Kitap başarıyla eklendi',
+      book,
+      isExisting: false
+    });
+    
+  } catch (error) {
+    console.error('Book check/create error:', error);
+    res.status(500).json({ 
+      message: 'Kitap kontrol/oluşturma sırasında hata oluştu',
+      error: error.message 
+    });
+  }
+});
+
 // ➕ Yeni kitap ekle
 router.post('/', authenticateToken, async (req, res) => {
   try {

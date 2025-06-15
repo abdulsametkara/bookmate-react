@@ -10,11 +10,18 @@ const userBooksRouter = require('./routes/userBooks');
 const readingSessionsRouter = require('./routes/readingSessions');
 const wishlistsRouter = require('./routes/wishlists');
 
+// Ortak okuma route'ları - YENİ YAPISI
+const sharedReadingRouter = require('./routes/sharedReading');
+const sharedSessionsRouter = require('./routes/sharedSessions');
+
 const app = express();
 const port = 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  credentials: true
+}));
 app.use(express.json());
 
 // Log all incoming requests
@@ -47,6 +54,8 @@ pool.connect((err, client, release) => {
   }
 });
 
+// Database pool is set later for routes
+
 // JWT Secret (production'da environment variable olmalı)
 const JWT_SECRET = 'bookmate_secret_key_2025';
 
@@ -61,10 +70,11 @@ const authenticateToken = (req, res, next) => {
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.id;
+    req.userId = decoded.userId || decoded.id;
     req.userEmail = decoded.email;
     next();
   } catch (error) {
+    console.error('JWT verification error:', error);
     return res.status(403).json({ message: 'Geçersiz token' });
   }
 };
@@ -89,15 +99,15 @@ app.get('/', (req, res) => {
 // Register endpoint
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName, username } = req.body;
     
-    console.log('Register request:', { email, displayName });
+    console.log('Register request:', { email, displayName, username });
 
     if (!email || !password || !displayName) {
       return res.status(400).json({ message: 'Tüm alanlar zorunludur' });
     }
 
-    // Check if user exists
+    // Check if user exists by email
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ message: 'Bu email adresi zaten kullanılıyor' });
@@ -106,17 +116,37 @@ app.post('/api/auth/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user
-    const result = await pool.query(
+    // Insert user - username kolonu varsa ekle
+    try {
+      // Username kolonu var mı kontrol et
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'username'
+      `);
+
+      let result;
+      if (columnCheck.rows.length > 0 && username) {
+        // Username kolonu varsa ve username verilmişse
+        console.log('📝 Inserting user with username...');
+        result = await pool.query(
+          'INSERT INTO users (email, password, "displayName", username) VALUES ($1, $2, $3, $4) RETURNING id, email, "displayName", username, "createdAt"',
+          [email, hashedPassword, displayName, username]
+        );
+      } else {
+        // Username kolonu yoksa veya username verilmemişse
+        console.log('📝 Inserting user without username...');
+        result = await pool.query(
       'INSERT INTO users (email, password, "displayName") VALUES ($1, $2, $3) RETURNING id, email, "displayName", "createdAt"',
       [email, hashedPassword, displayName]
     );
+      }
 
     const user = result.rows[0];
     console.log('User created:', user);
 
     // Generate token
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ userId: user.id, id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
 
     // Create default user preferences
     await pool.query(
@@ -129,6 +159,13 @@ app.post('/api/auth/register', async (req, res) => {
       user,
       token
     });
+    } catch (insertError) {
+      console.error('Insert error:', insertError);
+      if (insertError.code === '23505') { // Unique constraint violation
+        return res.status(400).json({ message: 'Bu kullanıcı adı zaten kullanılıyor' });
+      }
+      throw insertError;
+    }
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -157,7 +194,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Generate token
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ userId: user.id, id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
 
     // Remove password from response
     delete user.password;
@@ -189,6 +226,98 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Test endpoint for debugging
+app.get('/api/test-endpoint', (req, res) => {
+  console.log('🧪 Test endpoint called successfully!');
+  res.json({ message: 'Test endpoint working!', timestamp: new Date().toISOString() });
+});
+
+// Check username availability
+app.get('/api/auth/check-username/:username', async (req, res) => {
+  console.log('🚀 USERNAME CHECK ENDPOINT HIT!');
+  try {
+    const { username } = req.params;
+    console.log(`🔍 Username check request: ${username}`);
+
+    // Username formatını kontrol et
+    if (!username || username.length < 3 || username.length > 20) {
+      console.log(`❌ Invalid username length: ${username?.length || 0}`);
+      return res.status(400).json({
+        available: false,
+        message: 'Kullanıcı adı 3-20 karakter olmalıdır'
+      });
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      console.log(`❌ Invalid username format: ${username}`);
+      return res.status(400).json({
+        available: false,
+        message: 'Kullanıcı adı sadece harf, rakam ve _ içerebilir'
+      });
+    }
+
+    // Reserved username'leri kontrol et
+    const reservedUsernames = ['admin', 'test', 'user', 'root', 'administrator'];
+    if (reservedUsernames.includes(username.toLowerCase())) {
+      console.log(`❌ Reserved username: ${username}`);
+      return res.status(400).json({
+        available: false,
+        message: 'Bu kullanıcı adı kullanılamaz'
+      });
+    }
+
+    // Veritabanında username kontrolü yap
+    try {
+      // Önce username kolonu var mı kontrol et
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'username'
+      `);
+
+      if (columnCheck.rows.length > 0) {
+        // Username kolonu varsa, veritabanında kontrol et
+        console.log('🔍 Checking username in database...');
+        const existingUser = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
+        
+        const isAvailable = existingUser.rows.length === 0;
+        console.log(`✅ Username ${username} availability (database): ${isAvailable}`);
+        
+        res.json({
+          available: isAvailable,
+          message: isAvailable ? 'Kullanıcı adı müsait' : 'Bu kullanıcı adı zaten alınmış'
+        });
+      } else {
+        // Username kolonu yoksa, displayName ile kontrol et
+        console.log('⚠️ Username column not found, checking displayName...');
+        const existingUser = await pool.query('SELECT id FROM users WHERE "displayName" = $1', [username]);
+        
+        const isAvailable = existingUser.rows.length === 0;
+        console.log(`✅ Username ${username} availability (displayName): ${isAvailable}`);
+    
+    res.json({
+      available: isAvailable,
+      message: isAvailable ? 'Kullanıcı adı müsait' : 'Bu kullanıcı adı zaten alınmış'
+    });
+      }
+    } catch (dbError) {
+      console.error('Database check error:', dbError);
+      // Fallback to reserved usernames check
+      const isAvailable = !reservedUsernames.includes(username.toLowerCase());
+      res.json({
+        available: isAvailable,
+        message: isAvailable ? 'Kullanıcı adı müsait (fallback)' : 'Bu kullanıcı adı zaten alınmış'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Username check error:', error);
+    res.status(500).json({
+      available: false,
+      message: 'Server error'
+    });
   }
 });
 
@@ -356,6 +485,18 @@ app.use('/api/books', booksRouter);
 app.use('/api/user/books', userBooksRouter);
 app.use('/api/user/reading-sessions', readingSessionsRouter);
 app.use('/api/user/wishlists', wishlistsRouter);
+
+// Set database pool for shared reading routes
+app.set('db', pool);
+
+// Mount shared reading routes (authentication is handled inside the routes)
+try {
+  app.use('/api/shared-reading', sharedReadingRouter);
+  app.use('/api/shared-sessions', sharedSessionsRouter);
+  console.log('✅ Shared reading routes mounted');
+} catch (error) {
+  console.error('❌ Error mounting shared reading routes:', error);
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -17,17 +17,18 @@ import {
   Platform
 } from 'react-native';
 import { Surface } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, FontSizes, Spacing, BorderRadius } from '../theme/theme';
 import { useSelector } from 'react-redux';
 import { RootState, useAppDispatch } from '../store';
-import { updateBookStatus } from '../store/bookSlice';
+import { updateBookStatus, updateBook, saveBooks } from '../store/bookSlice';
 import ReadingSessionManager, { ReadingStats } from '../utils/readingSessionManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomToast from '../components/CustomToast';
 import { useToast } from '../hooks/useToast';
 import { LinearGradient } from 'expo-linear-gradient';
+import { updateReadingProgress } from '../services/sharedReadingApi';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,14 +41,19 @@ interface TimerState {
   startPage: number;
   selectedBookId: string | null;
   lastUpdateTime: string;
+  sharedSessionId?: string | null; // Shared session tracking
 }
 
 const ReadingTimerScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const dispatch = useAppDispatch();
-  const { toast, showSuccess, showError, showInfo, hideToast } = useToast();
+  const { toasts, showSuccess, showError, showInfo, hideToast } = useToast();
   const intervalRef = useRef(null);
   const appState = useRef(AppState.currentState);
+  
+  // Route params'dan shared session ID'sini al
+  const routeSharedSessionId = (route.params as any)?.sharedSessionId;
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,6 +74,7 @@ const ReadingTimerScreen = () => {
   // Reading session tracking
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [startPage, setStartPage] = useState(0);
+  const [sharedSessionId, setSharedSessionId] = useState<string | null>(null);
   
   // Real reading stats from ReadingSessionManager
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
@@ -81,6 +88,26 @@ const ReadingTimerScreen = () => {
 
   // AsyncStorage keys
   const TIMER_STATE_KEY = `timer_state_${currentUserId}`;
+
+  // Update selected book when Redux store changes
+  useEffect(() => {
+    if (selectedBook && reduxBooks.length > 0) {
+      const updatedBook = reduxBooks.find(b => b.id === selectedBook.id);
+      if (updatedBook && (
+        updatedBook.currentPage !== selectedBook.currentPage ||
+        updatedBook.progress !== selectedBook.progress ||
+        updatedBook.status !== selectedBook.status
+      )) {
+        setSelectedBook(updatedBook);
+        console.log('Selected book updated from Redux store:', {
+          id: updatedBook.id,
+          title: updatedBook.title,
+          currentPage: updatedBook.currentPage,
+          progress: updatedBook.progress
+        });
+      }
+    }
+  }, [reduxBooks, selectedBook]);
 
   // Entry animation
   useEffect(() => {
@@ -312,7 +339,13 @@ const ReadingTimerScreen = () => {
     if (reduxBooks.length > 0) {
       loadTimerState();
     }
-  }, [currentUserId, reduxBooks]);
+    
+    // Set shared session ID if provided
+    if (routeSharedSessionId) {
+      setSharedSessionId(routeSharedSessionId);
+      console.log('📱 Timer opened from shared session:', routeSharedSessionId);
+    }
+  }, [currentUserId, reduxBooks, routeSharedSessionId]);
 
   // Otomatik kitap seçimi - reduxBooks değiştiğinde "READING" durumundaki kitabı seç
   useEffect(() => {
@@ -423,7 +456,7 @@ const ReadingTimerScreen = () => {
 
   const startTimer = async () => {
     if (!selectedBook) {
-      showError('Lütfen önce bir kitap seçin');
+      showError('Hata', 'Lütfen önce bir kitap seçin');
       return;
     }
 
@@ -440,27 +473,27 @@ const ReadingTimerScreen = () => {
       setIsRunning(true);
       setIsPaused(false);
       
-      showSuccess('Okuma oturumu başlatıldı! 📚');
+      showSuccess('Başarılı', 'Okuma oturumu başlatıldı! 📚');
       console.log('Timer started with session ID:', sessionId);
     } catch (error) {
       console.error('Error starting timer:', error);
-      showError('Okuma oturumu başlatılamadı');
+      showError('Hata', 'Okuma oturumu başlatılamadı');
     }
   };
 
   const pauseTimer = () => {
     setIsPaused(true);
-    showInfo('Okuma oturumu duraklatıldı ⏸️');
+    showInfo('Duraklatıldı', 'Okuma oturumu duraklatıldı ⏸️');
   };
 
   const resumeTimer = () => {
     setIsPaused(false);
-    showSuccess('Okuma oturumu devam ediyor! ▶️');
+    showSuccess('Devam', 'Okuma oturumu devam ediyor! ▶️');
   };
 
   const stopTimer = async () => {
     if (sessionSeconds === 0) {
-      showError('Henüz okuma yapmadınız');
+      showError('Hata', 'Henüz okuma yapmadınız');
       return;
     }
 
@@ -480,6 +513,53 @@ const ReadingTimerScreen = () => {
         });
       }
 
+      // Update book progress in Redux store if there's a selected book
+      if (selectedBook && selectedBook.currentPage !== undefined) {
+        const updatedBook = {
+          ...selectedBook,
+          currentPage: selectedBook.currentPage,
+          progress: selectedBook.pageCount > 0 ? (selectedBook.currentPage / selectedBook.pageCount) * 100 : 0,
+          updatedAt: new Date().toISOString(),
+          lastReadAt: new Date().toISOString()
+        };
+        
+        // Update Redux store
+        dispatch(updateBook(updatedBook));
+        
+        // Save to AsyncStorage
+        const allBooks = reduxBooks.map(b => b.id === selectedBook.id ? updatedBook : b);
+        if (currentUserId) {
+          await saveBooks(allBooks, currentUserId);
+        }
+        
+        console.log('Book progress updated:', {
+          bookId: selectedBook.id,
+          title: selectedBook.title,
+          currentPage: selectedBook.currentPage,
+          progress: updatedBook.progress
+        });
+        
+        // Update shared session progress if in shared session
+        if (sharedSessionId && selectedBook) {
+          try {
+            await updateReadingProgress({
+              sessionId: sharedSessionId,
+              bookId: selectedBook.id,
+              currentPage: selectedBook.currentPage || 0,
+              totalPages: selectedBook.pageCount || 300
+            });
+            console.log('📊 Shared session progress updated:', {
+              sessionId: sharedSessionId,
+              bookId: selectedBook.id,
+              currentPage: selectedBook.currentPage,
+              totalPages: selectedBook.pageCount
+            });
+          } catch (progressError) {
+            console.warn('⚠️ Failed to update shared session progress:', progressError);
+          }
+        }
+      }
+
       // Reset timer state
       setIsRunning(false);
       setIsPaused(false);
@@ -494,11 +574,11 @@ const ReadingTimerScreen = () => {
       await loadReadingStats();
       
       const timeFormatted = formatTime(sessionSeconds);
-      showSuccess(`Okuma oturumu kaydedildi! 🎉\nSüre: ${timeFormatted.formatted}`);
+      showSuccess('Kaydedildi', `Okuma oturumu kaydedildi! 🎉\nSüre: ${timeFormatted.formatted}`);
       
     } catch (error) {
       console.error('Error stopping timer:', error);
-      showError('Okuma oturumu kaydedilemedi');
+      showError('Hata', 'Okuma oturumu kaydedilemedi');
     }
   };
 
@@ -511,8 +591,17 @@ const ReadingTimerScreen = () => {
   };
 
   const handleBookSelection = (book) => {
-    setSelectedBook(book);
+    // Get the latest version of the book from Redux store
+    const latestBook = reduxBooks.find(b => b.id === book.id) || book;
+    setSelectedBook(latestBook);
+    setStartPage(latestBook.currentPage || 0);
     setShowBookSelectionModal(false);
+    console.log('Book selected for reading:', {
+      id: latestBook.id,
+      title: latestBook.title,
+      currentPage: latestBook.currentPage,
+      progress: latestBook.progress
+    });
   };
 
   const renderBookItem = ({ item }) => (
@@ -925,15 +1014,17 @@ const ReadingTimerScreen = () => {
         </View>
       </Modal>
       
-      {/* Custom Toast */}
-      <CustomToast
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        duration={toast.duration}
-        onHide={hideToast}
-        action={toast.action}
-      />
+      {/* Custom Toasts */}
+      {toasts.map((toast) => (
+        <CustomToast
+          key={toast.id}
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onHide={() => hideToast(toast.id)}
+        />
+      ))}
     </View>
   );
 };

@@ -22,6 +22,7 @@ import { setCurrentUser } from '../store/bookSlice';
 import UserManager from '../utils/userManager';
 import ProgressModal from '../components/ProgressModal';
 import CustomToast from '../components/CustomToast';
+import UsernameInput from '../components/UsernameInput';
 
 type RootStackParamList = {
   Login: { prefilledEmail?: string };
@@ -34,10 +35,12 @@ const RegisterScreen = () => {
   const navigation = useNavigation();
   const [formData, setFormData] = useState({
     displayName: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
+  const [isUsernameValid, setIsUsernameValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,6 +79,16 @@ const RegisterScreen = () => {
   const validateForm = () => {
     if (!formData.displayName.trim()) {
       showToast('error', 'İsim soyisim alanı zorunludur.');
+      return false;
+    }
+
+    if (!formData.username.trim()) {
+      showToast('error', 'Kullanıcı adı zorunludur.');
+      return false;
+    }
+
+    if (!isUsernameValid) {
+      showToast('error', 'Geçerli bir kullanıcı adı giriniz.');
       return false;
     }
 
@@ -118,7 +131,8 @@ const RegisterScreen = () => {
       const response = await register({
         email: formData.email.trim(),
         password: formData.password,
-        displayName: formData.displayName.trim()
+        displayName: formData.displayName.trim(),
+        username: formData.username.trim()
       });
 
       console.log('✅ Registration successful:', response.user);
@@ -182,6 +196,16 @@ const RegisterScreen = () => {
                   autoCapitalize="words"
                 />
               </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Kullanıcı Adı</Text>
+              <UsernameInput
+                value={formData.username}
+                onChangeText={(value) => handleInputChange('username', value)}
+                onValidationChange={setIsUsernameValid}
+                placeholder="kullanici_adi"
+              />
             </View>
 
             <View style={styles.inputContainer}>

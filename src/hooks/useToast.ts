@@ -1,65 +1,52 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
-export interface ToastState {
-  visible: boolean;
+export interface Toast {
+  id: string;
   message: string;
   type: 'success' | 'error' | 'warning' | 'info';
   duration?: number;
-  action?: {
-    label: string;
-    onPress: () => void;
-  };
 }
 
 export const useToast = () => {
-  const [toast, setToast] = useState<ToastState>({
-    visible: false,
-    message: '',
-    type: 'info',
-  });
+  const [toast, setToast] = useState<Toast | null>(null);
 
-  const showToast = (
-    message: string,
+  const showToast = useCallback((
+    message: string, 
     type: 'success' | 'error' | 'warning' | 'info' = 'info',
-    duration?: number,
-    action?: { label: string; onPress: () => void }
+    duration: number = 3000
   ) => {
-    setToast({
-      visible: true,
-      message,
-      type,
-      duration,
-      action,
-    });
-  };
+    const id = Date.now().toString();
+    setToast({ id, message, type, duration });
+  }, []);
 
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, visible: false }));
-  };
+  const hideToast = useCallback(() => {
+    setToast(null);
+  }, []);
 
-  const showSuccess = (message: string, duration?: number) => {
+  // Convenience methods
+  const success = useCallback((message: string, duration?: number) => {
     showToast(message, 'success', duration);
-  };
+  }, [showToast]);
 
-  const showError = (message: string, duration?: number) => {
+  const error = useCallback((message: string, duration?: number) => {
     showToast(message, 'error', duration);
-  };
+  }, [showToast]);
 
-  const showWarning = (message: string, duration?: number) => {
+  const warning = useCallback((message: string, duration?: number) => {
     showToast(message, 'warning', duration);
-  };
+  }, [showToast]);
 
-  const showInfo = (message: string, duration?: number) => {
+  const info = useCallback((message: string, duration?: number) => {
     showToast(message, 'info', duration);
-  };
+  }, [showToast]);
 
   return {
     toast,
     showToast,
     hideToast,
-    showSuccess,
-    showError,
-    showWarning,
-    showInfo,
+    success,
+    error,
+    warning,
+    info,
   };
 }; 

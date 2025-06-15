@@ -21,7 +21,7 @@ const existingBook = {
   id: '1',
   title: 'İçimizdeki Şeytan',
   author: 'Sabahattin Ali',
-  coverURL: 'https://i.dr.com.tr/cache/600x600-0/originals/0000000064552-1.jpg',
+  coverURL: 'https://covers.openlibrary.org/b/isbn/9789753638029-L.jpg',
   genre: 'Roman',
   publishYear: 1940,
   publisher: 'YKY',

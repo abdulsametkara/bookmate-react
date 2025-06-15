@@ -22,6 +22,7 @@ export interface Book {
   isJointReading?: boolean;
   startDate?: string;
   isFavorite?: boolean;
+  lastReadAt?: string;
 }
 
 interface BooksState {

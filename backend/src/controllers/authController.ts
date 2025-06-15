@@ -1,11 +1,55 @@
 import { Request, Response } from 'express';
-import { User } from '../models';
+import User from '../models/User';
 import { generateToken } from '../utils/jwt';
+
+// Username müsaitlik kontrolü
+export const checkUsername = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { username } = req.params;
+    console.log(`🔍 checkUsername called with username: ${username}`);
+
+    // Username formatını kontrol et
+    if (!username || username.length < 3 || username.length > 20) {
+      console.log(`❌ Invalid username length: ${username?.length || 0}`);
+      res.status(400).json({ 
+        available: false, 
+        message: 'Kullanıcı adı 3-20 karakter olmalıdır' 
+      });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      console.log(`❌ Invalid username format: ${username}`);
+      res.status(400).json({ 
+        available: false, 
+        message: 'Kullanıcı adı sadece harf, rakam ve _ içerebilir' 
+      });
+      return;
+    }
+
+    // Username kullanımda mı kontrol et
+    const existingUser = await User.findOne({ where: { username } });
+    const isAvailable = !existingUser;
+    
+    console.log(`✅ Username ${username} availability: ${isAvailable}`);
+    
+    res.status(200).json({
+      available: isAvailable,
+      message: isAvailable ? 'Kullanıcı adı müsait' : 'Bu kullanıcı adı zaten alınmış'
+    });
+  } catch (error) {
+    console.error('❌ Check username error:', error);
+    res.status(500).json({ 
+      available: false,
+      message: 'Server error' 
+    });
+  }
+};
 
 // Kullanıcı kaydı
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName, username } = req.body;
 
     // Email formatını kontrol et
     if (!email || !email.includes('@') || !email.includes('.')) {
@@ -19,10 +63,28 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Username kontrolü
+    if (!username || username.length < 3 || username.length > 20) {
+      res.status(400).json({ message: 'Kullanıcı adı 3-20 karakter olmalıdır' });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      res.status(400).json({ message: 'Kullanıcı adı sadece harf, rakam ve _ içerebilir' });
+      return;
+    }
+
     // Aynı email ile kayıtlı kullanıcı var mı kontrol et
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
+    const existingEmail = await User.findOne({ where: { email } });
+    if (existingEmail) {
       res.status(400).json({ message: 'Bu email adresi zaten kullanılıyor' });
+      return;
+    }
+
+    // Aynı username ile kayıtlı kullanıcı var mı kontrol et
+    const existingUsername = await User.findOne({ where: { username } });
+    if (existingUsername) {
+      res.status(400).json({ message: 'Bu kullanıcı adı zaten alınmış' });
       return;
     }
 
@@ -30,7 +92,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const user = await User.create({
       email,
       password,
-      displayName: displayName || email.split('@')[0], // displayName yoksa email'den üret
+      displayName: displayName || username,
+      username
     });
 
     // Kullanıcı verilerinden şifreyi çıkar
@@ -45,9 +108,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       user: userData,
       token
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Register error:', error);
-    res.status(500).json({ message: 'Server error' });
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      res.status(400).json({ message: 'Bu kullanıcı adı veya email zaten kullanılıyor' });
+    } else {
+      res.status(500).json({ message: 'Server error' });
+    }
   }
 };
 
@@ -121,6 +188,36 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
     });
   } catch (error) {
     console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Username ile kullanıcı ara
+export const searchByUsername = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { username } = req.params;
+
+    if (!username || username.length < 3) {
+      res.status(400).json({ message: 'Arama için en az 3 karakter giriniz' });
+      return;
+    }
+
+    const user = await User.findOne({
+      where: { username },
+      attributes: ['id', 'username', 'displayName', 'photoURL']
+    });
+
+    if (!user) {
+      res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Kullanıcı bulundu',
+      user
+    });
+  } catch (error) {
+    console.error('Search username error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 }; 

@@ -10,7 +10,8 @@ import {
   Dimensions, 
   Alert,
   StatusBar,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/core';
@@ -20,10 +21,16 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useAppSelector } from '../store';
 import UserManager, { User } from '../utils/userManager';
 import ReadingSessionManager, { ReadingStats } from '../utils/readingSessionManager';
-import { loadBooks, setBooks } from '../store/bookSlice';
+import { setBooks } from '../store/bookSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, getApiUrl, getAuthHeaders } from '../config/api';
-import { saveBooks } from '../utils/storageUtils';
+import GoogleBooksService from '../services/googleBooksService';
+import {
+  getSharedReadingSessions,
+  getFriends,
+  SharedReadingSession,
+  User as SharedUser,
+} from '../services/sharedReadingApi';
 
 const { width } = Dimensions.get('window');
 
@@ -37,12 +44,19 @@ const HomeScreen = () => {
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null);
   const [todayStats, setTodayStats] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Shared Reading State
+  const [sharedReadingSessions, setSharedReadingSessions] = useState<SharedReadingSession[]>([]);
+  const [friends, setFriends] = useState<SharedUser[]>([]);
+  const [sharedReadingLoading, setSharedReadingLoading] = useState(false);
 
   // Load books data
   const loadBooksData = useCallback(async () => {
     if (currentUserId) {
       try {
-        const loadedBooks = await loadBooks(currentUserId);
+        const storageKey = `bookmate_books_${currentUserId}`;
+        const booksData = await AsyncStorage.getItem(storageKey);
+        const loadedBooks = booksData ? JSON.parse(booksData) : [];
         dispatch(setBooks(loadedBooks));
       } catch (error) {
         console.error('Error loading books:', error);
@@ -71,16 +85,46 @@ const HomeScreen = () => {
     }
   }, [currentUserId]);
 
+  // Load shared reading data
+  const loadSharedReadingData = useCallback(async () => {
+    try {
+      setSharedReadingLoading(true);
+      
+      // Load sessions and friends in parallel
+      const [sessionsData, friendsData] = await Promise.all([
+        getSharedReadingSessions().catch(() => []),
+        getFriends().catch(() => [])
+      ]);
+      
+      setSharedReadingSessions(sessionsData);
+      setFriends(friendsData);
+      
+      console.log('📚 Shared Reading Data Loaded:', {
+        sessions: sessionsData.length,
+        friends: friendsData.length
+      });
+      
+    } catch (error) {
+      console.error('Error loading shared reading data:', error);
+      setSharedReadingSessions([]);
+      setFriends([]);
+    } finally {
+      setSharedReadingLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadUserData();
-  }, [loadUserData]);
+    loadSharedReadingData();
+  }, [loadUserData, loadSharedReadingData]);
 
   // Focus effect to reload books and user data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadBooksData();
       loadUserData();
-    }, [currentUserId, loadBooksData, loadUserData])
+      loadSharedReadingData();
+    }, [currentUserId, loadBooksData, loadUserData, loadSharedReadingData])
   );
 
   // Calculate real statistics from books and reading sessions
@@ -94,8 +138,13 @@ const HomeScreen = () => {
     return total + (book.currentPage || 0);
   }, 0);
 
-  // Find currently reading book
-  const currentlyReading = currentlyReadingBooks.length > 0 ? currentlyReadingBooks[0] : null;
+  // Find currently reading book - prioritize most recently read
+  const currentlyReading = currentlyReadingBooks.length > 0 ? 
+    currentlyReadingBooks.sort((a, b) => {
+      const aLastRead = a.lastReadAt ? new Date(a.lastReadAt).getTime() : 0;
+      const bLastRead = b.lastReadAt ? new Date(b.lastReadAt).getTime() : 0;
+      return bLastRead - aLastRead; // Most recent first
+    })[0] : null;
 
   // Refresh functionality
   const onRefresh = useCallback(async () => {
@@ -121,10 +170,143 @@ const HomeScreen = () => {
   };
 
   const handleAddPartner = () => {
-    Alert.alert(
-      'Ortak Okuma',
-      'Ortak okuma özelliği yakında eklenecek! Partnerinizle birlikte okuma deneyimini paylaşabileceksiniz.',
-      [{ text: 'Tamam' }]
+    navigation.navigate('SharedReading' as never);
+  };
+
+  const handleRecommendationCard = (category: 'popular' | 'personalized' | 'classics' | 'new', title: string) => {
+    navigation.navigate('BookRecommendations', { category, title });
+  };
+
+  // Render dynamic shared reading section
+  const renderSharedReadingSection = () => {
+    const activeSessions = sharedReadingSessions.filter(session => session.status === 'active');
+    const hasFriends = friends.length > 0;
+    const hasActiveSessions = activeSessions.length > 0;
+
+    if (sharedReadingLoading) {
+      return (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>📚 Ortak Okuma</Text>
+          </View>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="small" color="#007AFF" />
+            <Text style={styles.loadingText}>Yükleniyor...</Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Show active sessions if any
+    if (hasActiveSessions) {
+      return (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>📚 Ortak Okuma</Text>
+            <TouchableOpacity style={styles.addButton} onPress={handleAddPartner}>
+              <MaterialCommunityIcons name="plus" size={18} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sessionsScroll}>
+            {activeSessions.slice(0, 3).map((session) => (
+              <TouchableOpacity
+                key={session.id}
+                style={styles.sessionCard}
+                onPress={() => navigation.navigate('SharedReadingSession' as never, { sessionId: session.id } as never)}
+              >
+                <View style={styles.sessionHeader}>
+                  <MaterialCommunityIcons name="account-group" size={20} color="#007AFF" />
+                  <Text style={styles.sessionTitle} numberOfLines={1}>{session.title}</Text>
+                </View>
+                <Text style={styles.sessionDesc} numberOfLines={2}>
+                  {session.description || 'Aktif okuma oturumu'}
+                </Text>
+                <Text style={styles.sessionMembers}>
+                  {session.partner_ids?.length || 1} kişi • {session.reading_mode}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            
+            <TouchableOpacity
+              style={styles.addSessionCard}
+              onPress={() => navigation.navigate('StartSharedReading' as never)}
+            >
+              <MaterialCommunityIcons name="plus-circle" size={32} color="#007AFF" />
+              <Text style={styles.addSessionText}>Yeni Oturum</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      );
+    }
+
+    // Show friends if has friends but no active sessions
+    if (hasFriends) {
+      return (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>📚 Ortak Okuma</Text>
+            <TouchableOpacity style={styles.addButton} onPress={handleAddPartner}>
+              <MaterialCommunityIcons name="eye" size={18} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.friendsCard}>
+            <View style={styles.friendsHeader}>
+              <MaterialCommunityIcons name="account-heart" size={28} color="#4CAF50" />
+              <Text style={styles.friendsTitle}>{friends.length} Arkadaşınız var! 🎉</Text>
+            </View>
+            <Text style={styles.friendsSubtitle}>
+              Arkadaşlarınızla birlikte okuma oturumu başlatın
+            </Text>
+            
+            <View style={styles.friendsAvatars}>
+              {friends.slice(0, 4).map((friend, index) => (
+                <View key={friend.id} style={[styles.friendAvatar, { marginLeft: index > 0 ? -8 : 0 }]}>
+                  <Text style={styles.friendAvatarText}>
+                    {friend.displayName?.charAt(0)?.toUpperCase() || 'U'}
+                  </Text>
+                </View>
+              ))}
+              {friends.length > 4 && (
+                <View style={[styles.friendAvatar, { marginLeft: -8, backgroundColor: '#9CA3AF' }]}>
+                  <Text style={styles.friendAvatarText}>+{friends.length - 4}</Text>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.startReadingButton} onPress={() => navigation.navigate('StartSharedReading' as never)}>
+              <MaterialCommunityIcons name="book-plus" size={18} color="#fff" />
+              <Text style={styles.startReadingButtonText}>Okuma Oturumu Başlat</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    // Default onboarding state
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>📚 Ortak Okuma</Text>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddPartner}>
+            <MaterialCommunityIcons name="plus" size={18} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.partnerCard}>
+          <View style={styles.partnerIcon}>
+            <MaterialCommunityIcons name="account-multiple-plus" size={32} color="#007AFF" />
+          </View>
+          <Text style={styles.partnerTitle}>Partnerinizi Ekleyin</Text>
+          <Text style={styles.partnerSubtitle}>
+            Sevgiliniz, arkadaşınız veya ailenizle birlikte okuma deneyimi yaşayın
+          </Text>
+          <TouchableOpacity style={styles.partnerButton} onPress={handleAddPartner}>
+            <Text style={styles.partnerButtonText}>Başla</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   };
 
@@ -140,11 +322,16 @@ const HomeScreen = () => {
             {currentUser?.displayName?.split(' ')[0] || 'BookMate Kullanıcısı'}
           </Text>
         </View>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate('SharedReading' as never)}>
+            <MaterialCommunityIcons name="account-multiple" size={24} color="#007AFF" />
+          </TouchableOpacity>
         <TouchableOpacity style={styles.profileButton} onPress={goToProfile}>
           <View style={styles.profileButtonInner}>
             <MaterialCommunityIcons name="account" size={24} color="#007AFF" />
           </View>
         </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
@@ -199,7 +386,7 @@ const HomeScreen = () => {
               <View style={styles.progressContent}>
                 <View style={styles.bookCoverContainer}>
                   <Image 
-                    source={{ uri: currentlyReading.coverURL || 'https://via.placeholder.com/80x120?text=Kapak+Yok' }}
+                    source={{ uri: currentlyReading.coverURL || GoogleBooksService.getFallbackCover(currentlyReading.title || 'Kitap') }}
                     style={styles.bookCover}
                     resizeMode="cover"
                   />
@@ -248,27 +435,7 @@ const HomeScreen = () => {
         </View>
 
         {/* Partner Updates */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📚 Ortak Okuma</Text>
-            <TouchableOpacity style={styles.addButton} onPress={handleAddPartner}>
-              <MaterialCommunityIcons name="plus" size={18} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.partnerCard}>
-            <View style={styles.partnerIcon}>
-              <MaterialCommunityIcons name="account-multiple-plus" size={32} color="#007AFF" />
-            </View>
-            <Text style={styles.partnerTitle}>Partnerinizi Ekleyin</Text>
-            <Text style={styles.partnerSubtitle}>
-              Sevgiliniz, arkadaşınız veya ailenizle birlikte okuma deneyimi yaşayın
-            </Text>
-            <TouchableOpacity style={styles.partnerButton} onPress={handleAddPartner}>
-              <Text style={styles.partnerButtonText}>Yakında</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {renderSharedReadingSection()}
 
         {/* Daily Reading Goal */}
         {readingStats && (
@@ -319,38 +486,54 @@ const HomeScreen = () => {
 
             <View style={styles.recommendedGrid}>
               <View style={styles.recommendedRow}>
-                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}>
+                <TouchableOpacity 
+                  style={[styles.recommendedCard, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}
+                  onPress={() => handleRecommendationCard('popular', 'Popüler Kitaplar')}
+                  activeOpacity={0.8}
+                >
                   <MaterialCommunityIcons name="trending-up" size={24} color="#007AFF" />
                   <Text style={styles.recommendedCardTitle}>Popüler</Text>
                   <Text style={styles.recommendedCardDesc}>En çok okunan kitaplar</Text>
-                </View>
+                </TouchableOpacity>
 
-                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
+                <TouchableOpacity 
+                  style={[styles.recommendedCard, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}
+                  onPress={() => handleRecommendationCard('personalized', 'Size Özel Öneriler')}
+                  activeOpacity={0.8}
+                >
                   <MaterialCommunityIcons name="account-heart" size={24} color="#4CAF50" />
                   <Text style={styles.recommendedCardTitle}>Size Özel</Text>
                   <Text style={styles.recommendedCardDesc}>Okuma geçmişinize göre</Text>
-                </View>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.recommendedRow}>
-                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+                <TouchableOpacity 
+                  style={[styles.recommendedCard, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}
+                  onPress={() => handleRecommendationCard('classics', 'Klasik Eserler')}
+                  activeOpacity={0.8}
+                >
                   <MaterialCommunityIcons name="book-open-variant" size={24} color="#8B5CF6" />
                   <Text style={styles.recommendedCardTitle}>Klasikler</Text>
                   <Text style={styles.recommendedCardDesc}>Zamanın test ettiği eserler</Text>
-                </View>
+                </TouchableOpacity>
 
-                <View style={[styles.recommendedCard, { backgroundColor: 'rgba(255, 184, 0, 0.1)' }]}>
+                <TouchableOpacity 
+                  style={[styles.recommendedCard, { backgroundColor: 'rgba(255, 184, 0, 0.1)' }]}
+                  onPress={() => handleRecommendationCard('new', 'Yeni Çıkan Kitaplar')}
+                  activeOpacity={0.8}
+                >
                   <MaterialCommunityIcons name="star-outline" size={24} color="#FFB800" />
                   <Text style={styles.recommendedCardTitle}>Yeni Çıkanlar</Text>
                   <Text style={styles.recommendedCardDesc}>Son eklenen kitaplar</Text>
-                </View>
+                </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.comingSoonBanner}>
               <MaterialCommunityIcons name="rocket-launch" size={20} color="#FF6B6B" />
               <Text style={styles.comingSoonText}>
-                Detaylı kitap önerileri ve kategoriler yakında geliyor! 🚀
+                AI destekli kişisel öneriler ve akıllı kategoriler çok yakında! 🚀
               </Text>
             </View>
           </View>
@@ -396,6 +579,16 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xl,
     fontWeight: '700',
     color: '#fff',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  headerButton: {
+    padding: Spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
   },
   profileButton: {
     padding: Spacing.sm,
@@ -783,6 +976,138 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
     textAlign: 'center',
+  },
+  loadingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  loadingText: {
+    fontSize: FontSizes.md,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginLeft: Spacing.sm,
+  },
+  sessionsScroll: {
+    marginBottom: Spacing.md,
+  },
+  sessionCard: {
+    width: 200,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: Spacing.lg,
+    marginRight: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sessionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  sessionTitle: {
+    fontSize: FontSizes.md,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginLeft: Spacing.sm,
+    flex: 1,
+  },
+  sessionDesc: {
+    fontSize: FontSizes.sm,
+    color: '#6B7280',
+    marginBottom: Spacing.sm,
+    lineHeight: 18,
+  },
+  sessionMembers: {
+    fontSize: FontSizes.xs,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  addSessionCard: {
+    width: 120,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    borderRadius: 16,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 122, 255, 0.2)',
+    borderStyle: 'dashed',
+  },
+  addSessionText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+  },
+  friendsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  friendsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  friendsTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginLeft: Spacing.sm,
+  },
+  friendsSubtitle: {
+    fontSize: FontSizes.md,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    lineHeight: 20,
+  },
+  friendsAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  friendAvatarText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  startReadingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  startReadingButtonText: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: Spacing.sm,
   },
 });
 

@@ -3,11 +3,13 @@ import { Platform } from 'react-native';
 
 export const API_CONFIG = {
   BASE_URL: Platform.select({
-    android: 'http://192.168.1.116:5000', // Android emülatör için backend IP
-    default: 'http://192.168.1.116:5000', // Diğer platformlar için backend IP
+    android: 'http://10.0.2.2:5000', // Android emülatör için 10.0.2.2 (localhost mapping)
+    ios: 'http://localhost:5000', // iOS simulator için localhost
+    default: 'http://localhost:5000', // Diğer platformlar için localhost
   }),
   ENDPOINTS: {
     AUTH: {
+      BASE: '/api/auth',
       LOGIN: '/api/auth/login',
       REGISTER: '/api/auth/register',
       ME: '/api/auth/me',

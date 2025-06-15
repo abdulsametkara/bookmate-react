@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, getApiUrl, getAuthHeaders } from '../config/api';
 import ProgressModal from '../components/ProgressModal';
 import CustomToast from '../components/CustomToast';
+import GoogleBooksService from '../services/googleBooksService';
 
 interface GoogleBook {
   id: string;
@@ -132,6 +133,14 @@ const WishlistScreen = () => {
     }
   }, [currentUserId]);
 
+  // Wishlist yüklendiğinde loading state'ini sıfırla
+  useEffect(() => {
+    if (wishlist.length >= 0 && isLoading) {
+      console.log('🎯 Wishlist loaded, resetting loading state');
+      setIsLoading(false);
+    }
+  }, [wishlist.length, isLoading]);
+
   // Backend API'den istek listesini yükle
   const loadWishlist = async () => {
     try {
@@ -140,6 +149,7 @@ const WishlistScreen = () => {
       
       if (!token) {
         showToast('error', 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        setIsLoading(false);
         return;
       }
 
@@ -156,9 +166,22 @@ const WishlistScreen = () => {
         const data = await response.json();
         setWishlist(data);
         console.log('✅ İstek listesi yüklendi:', data.length, 'kitap');
+      } else if (response.status === 401) {
+        // Token geçersizse logout yap
+        console.log('🔑 Token geçersiz, logout yapılıyor...');
+        await AsyncStorage.removeItem('bookmate_auth_token');
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('bookmate_current_session');
+        showToast('error', 'Oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+        // Navigate to auth screen
+        setTimeout(() => {
+          navigation.navigate('Auth');
+        }, 1500);
+        return;
       } else {
         const errorData = await response.json();
         console.error('❌ İstek listesi yükleme hatası:', errorData);
+        showToast('error', 'İstek listesi yüklenirken bir hata oluştu.');
       }
     } catch (error) {
       console.error('❌ İstek listesi yükleme hatası:', error);
@@ -198,6 +221,9 @@ const WishlistScreen = () => {
   // Kitabı backend'e ekle ve sonra istek listesine ekle
   const addToWishlist = async (googleBook: GoogleBook) => {
     try {
+      // Show loading toast
+      showToast('info', 'Kitap ekleniyor...');
+      
       const token = await AsyncStorage.getItem('bookmate_auth_token');
       
       if (!token) {
@@ -205,7 +231,7 @@ const WishlistScreen = () => {
         return;
       }
 
-      // 1. Önce kitabı backend books tablosuna ekle
+      // 1. Kitabı kontrol et veya oluştur (yeni endpoint)
       const bookData: Partial<BackendBook> = {
         title: googleBook.volumeInfo.title.replace(/\u0000/g, ''),
         author: (googleBook.volumeInfo.authors?.join(', ') || 'Bilinmeyen Yazar').replace(/\u0000/g, ''),
@@ -222,7 +248,7 @@ const WishlistScreen = () => {
 
       console.log('📚 Backend\'e kitap ekleniyor:', bookData.title);
 
-      const bookResponse = await fetch(getApiUrl('/api/books'), {
+      const bookResponse = await fetch(getApiUrl('/api/books/check-or-create'), {
         method: 'POST',
         headers: getAuthHeaders(token),
         body: JSON.stringify(bookData),
@@ -233,14 +259,27 @@ const WishlistScreen = () => {
       if (bookResponse.ok) {
         const bookResult = await bookResponse.json();
         bookId = bookResult.book.id;
-        console.log('✅ Kitap backend\'e eklendi, ID:', bookId);
-      } else if (bookResponse.status === 409) {
-        // Kitap zaten varsa, ID'sini al (bu endpoint'i eklememiz gerekebilir)
-        showToast('warning', 'Bu kitap zaten sistemde mevcut.');
+        
+        if (bookResult.isExisting) {
+          console.log('✅ Mevcut kitap bulundu, ID:', bookId);
+        } else {
+          console.log('✅ Yeni kitap oluşturuldu, ID:', bookId);
+        }
+      } else if (bookResponse.status === 401) {
+        // Token geçersizse logout yap
+        console.log('🔑 Token geçersiz, logout yapılıyor...');
+        await AsyncStorage.removeItem('bookmate_auth_token');
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('bookmate_current_session');
+        showToast('error', 'Oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+        // Navigate to auth screen
+        setTimeout(() => {
+          navigation.navigate('Auth');
+        }, 1500);
         return;
       } else {
         const errorData = await bookResponse.json();
-        console.error('❌ Kitap ekleme hatası:', errorData);
+        console.error('❌ Kitap kontrol/oluşturma hatası:', errorData);
         showToast('error', 'Kitap sisteme eklenirken bir hata oluştu.');
         return;
       }
@@ -419,12 +458,27 @@ const WishlistScreen = () => {
     }, 100);
   };
 
+  // Manual logout for debugging
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('bookmate_auth_token');
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('bookmate_current_session');
+      showToast('success', 'Çıkış yapıldı. Giriş ekranına yönlendiriliyorsunuz...');
+      setTimeout(() => {
+        navigation.navigate('Auth');
+      }, 1000);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   const renderWishlistItem = ({ item }: { item: WishlistItem }) => (
     <TouchableOpacity onPress={() => showWishlistItemOptions(item)}>
       <Surface style={styles.wishlistItem}>
         <View style={styles.bookCover}>
           <Image 
-            source={{ uri: item.cover_image_url || 'https://via.placeholder.com/60x80?text=Kapak+Yok' }}
+            source={{ uri: item.cover_image_url || GoogleBooksService.getFallbackCover(item.title) }}
             style={styles.bookImage}
           />
         </View>
@@ -450,7 +504,7 @@ const WishlistScreen = () => {
           <Image 
             source={{ 
               uri: item.volumeInfo.imageLinks?.thumbnail || 
-                   'https://via.placeholder.com/60x80?text=Kapak+Yok' 
+                   GoogleBooksService.getFallbackCover(item.volumeInfo.title)
             }}
             style={styles.bookImage}
           />
@@ -485,6 +539,12 @@ const WishlistScreen = () => {
         <SafeAreaView style={styles.blueHeaderContainer}>
           <View style={styles.blueHeader}>
             <Text style={styles.blueHeaderTitle}>İstek Listesi</Text>
+            <TouchableOpacity 
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <MaterialCommunityIcons name="logout" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
         
@@ -632,6 +692,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     textAlign: 'center',
+    flex: 1,
+  },
+  logoutButton: {
+    padding: Spacing.sm,
+    position: 'absolute',
+    right: Spacing.lg,
   },
   searchContainer: {
     paddingHorizontal: Spacing.lg,

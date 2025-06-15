@@ -5,6 +5,7 @@ export interface User {
   id: string;
   email?: string;
   displayName?: string;
+  username?: string;
   phone?: string;
   avatar?: string;
   passwordHash?: string; // Basit password sistemi için
@@ -133,6 +134,7 @@ export class UserManager {
         id: data.user.id,
         email: data.user.email,
         displayName: data.user.displayName,
+        username: data.user.username,
         createdAt: data.user.createdAt,
         lastLoginAt: new Date().toISOString(),
         preferences: {

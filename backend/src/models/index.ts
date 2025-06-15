@@ -20,9 +20,31 @@ import User from './User';
 import Book from './Book';
 import Note from './Note';
 import ReadingSession from './ReadingSession';
+import Partnership from './Partnership';
+import SharedReading from './SharedReading';
+import ReadingActivity from './ReadingActivity';
+import SharedMessage from './SharedMessage';
 
 // Modelleri ekle
-sequelize.addModels([User, Book, Note, ReadingSession]);
+sequelize.addModels([
+  User, 
+  Book, 
+  Note, 
+  ReadingSession,
+  Partnership,
+  SharedReading,
+  ReadingActivity,
+  SharedMessage
+]);
 
-export { User, Book, Note, ReadingSession };
+export { 
+  User, 
+  Book, 
+  Note, 
+  ReadingSession,
+  Partnership,
+  SharedReading,
+  ReadingActivity,
+  SharedMessage
+};
 export default sequelize; 
