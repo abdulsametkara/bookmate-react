@@ -15,7 +15,7 @@ const sharedReadingRouter = require('./routes/sharedReading');
 const sharedSessionsRouter = require('./routes/sharedSessions');
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
@@ -33,15 +33,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// Database connection
+// Database connection - Production ve Development için
 const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  database: 'bookmate_db',
-  user: 'postgres',
-  password: '246595',
-  ssl: false,
-  connectionTimeoutMillis: 5000,
+  // DATABASE_URL varsa onu kullan (Production), yoksa local config (Development)
+  connectionString: process.env.DATABASE_URL || undefined,
+  // Local development config
+  host: process.env.DATABASE_URL ? undefined : 'localhost',
+  port: process.env.DATABASE_URL ? undefined : 5432,
+  database: process.env.DATABASE_URL ? undefined : 'bookmate_db',
+  user: process.env.DATABASE_URL ? undefined : 'postgres',
+  password: process.env.DATABASE_URL ? undefined : '246595',
+  // Production için SSL gerekli, development için değil
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 10000,
 });
 
 // Test database connection
@@ -56,8 +60,8 @@ pool.connect((err, client, release) => {
 
 // Database pool is set later for routes
 
-// JWT Secret (production'da environment variable olmalı)
-const JWT_SECRET = 'bookmate_secret_key_2025';
+// JWT Secret - Environment variable'dan al
+const JWT_SECRET = process.env.JWT_SECRET || 'bookmate_secret_key_2025';
 
 // JWT middleware
 const authenticateToken = (req, res, next) => {

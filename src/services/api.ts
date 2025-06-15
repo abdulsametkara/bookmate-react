@@ -2,11 +2,11 @@ import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// API URL'leri - Platform bazlı IP adresi
-// Android emülatörde localhost yerine 10.0.2.2 kullanılır
+// API URL'leri - Development vs Production
 const API_URL = Platform.select({
-  android: 'http://10.0.2.2:5000/api', // Android emülatör için localhost
-  default: 'http://10.22.7.154:5000/api', // Diğer platformlar için
+  android: __DEV__ ? 'http://10.0.2.2:5000/api' : 'https://bookmate-react.onrender.com/api', // Production için Render URL
+  ios: __DEV__ ? 'http://localhost:5000/api' : 'https://bookmate-react.onrender.com/api', // Production için Render URL  
+  default: __DEV__ ? 'http://localhost:5000/api' : 'https://bookmate-react.onrender.com/api', // Production için Render URL
 });
 
 // Axios instance

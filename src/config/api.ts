@@ -3,9 +3,9 @@ import { Platform } from 'react-native';
 
 export const API_CONFIG = {
   BASE_URL: Platform.select({
-    android: 'http://10.0.2.2:5000', // Android emülatör için 10.0.2.2 (localhost mapping)
-    ios: 'http://localhost:5000', // iOS simulator için localhost
-    default: 'http://localhost:5000', // Diğer platformlar için localhost
+    android: __DEV__ ? 'http://10.0.2.2:5000' : 'https://bookmate-react.onrender.com', // Production için Render URL
+    ios: __DEV__ ? 'http://localhost:5000' : 'https://bookmate-react.onrender.com', // Production için Render URL
+    default: __DEV__ ? 'http://localhost:5000' : 'https://bookmate-react.onrender.com', // Production için Render URL
   }),
   ENDPOINTS: {
     AUTH: {
