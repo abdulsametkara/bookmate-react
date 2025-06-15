@@ -203,6 +203,36 @@ async function initializeDatabase(dbPool = null) {
     `);
     console.log('✅ Default categories inserted');
 
+    // Migrate existing data from local database
+    console.log('🔄 Migrating existing data...');
+    
+    // Read and execute migration SQL
+    const fs = require('fs');
+    const path = require('path');
+    const migrationPath = path.join(__dirname, 'data-migration.sql');
+    
+    if (fs.existsSync(migrationPath)) {
+      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+      const statements = migrationSQL.split('\n').filter(line => line.trim() && !line.startsWith('--'));
+      
+      console.log(`📊 Executing ${statements.length} migration statements...`);
+      
+      for (const statement of statements) {
+        try {
+          await pool.query(statement);
+        } catch (error) {
+          // Ignore conflicts and constraint errors - data might already exist
+          if (!error.code || !['23505', '23503'].includes(error.code)) {
+            console.warn('⚠️ Migration statement failed:', statement.substring(0, 100) + '...');
+          }
+        }
+      }
+      
+      console.log('✅ Data migration completed');
+    } else {
+      console.log('ℹ️ No migration file found, skipping data migration');
+    }
+
     console.log('🎉 Database initialization completed successfully!');
 
   } catch (error) {
