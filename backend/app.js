@@ -14,6 +14,9 @@ const wishlistsRouter = require('./routes/wishlists');
 const sharedReadingRouter = require('./routes/sharedReading');
 const sharedSessionsRouter = require('./routes/sharedSessions');
 
+// Database initialization
+const initializeDatabase = require('./init-database');
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -48,13 +51,22 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
-// Test database connection
-pool.connect((err, client, release) => {
+// Test database connection and initialize tables
+pool.connect(async (err, client, release) => {
   if (err) {
     console.error('Database connection error:', err);
   } else {
     console.log('Database connected successfully');
     release();
+    
+    // Initialize database tables
+    try {
+      console.log('🔄 Initializing database tables...');
+      await initializeDatabase(pool);
+      console.log('✅ Database tables initialized successfully');
+    } catch (initError) {
+      console.error('❌ Database initialization failed:', initError);
+    }
   }
 });
 
