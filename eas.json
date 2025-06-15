@@ -28,7 +28,6 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "OPENAI_API_KEY": "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",
         "USE_DEMO_MODE": "false",
         "NODE_ENV": "production"
       }

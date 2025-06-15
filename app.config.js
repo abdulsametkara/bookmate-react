@@ -20,14 +20,17 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.bookmate.app"
+      bundleIdentifier: "com.bookmate.reading.app",
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false
+      }
     },
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/icon.png",
         backgroundColor: "#FFFFFF"
       },
-      package: "com.bookmate.app",
+      package: "com.bookmate.reading.app",
       permissions: [
         "INTERNET",
         "ACCESS_NETWORK_STATE"
@@ -43,9 +46,9 @@ export default {
         projectId: "13360e4e-4d23-4374-bc21-164f0211a046"
       },
       // Environment variables'dan güvenli şekilde oku
-      openaiApiKey: process.env.OPENAI_API_KEY,
-      googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY,
-      useDemoMode: false,
+      openaiApiKey: process.env.OPENAI_API_KEY || process.env.EAS_BUILD_OPENAI_API_KEY,
+      googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY || process.env.EAS_BUILD_GOOGLE_BOOKS_API_KEY,
+      useDemoMode: process.env.USE_DEMO_MODE === 'true',
       openaiModel: "gpt-3.5-turbo",
       maxTokens: 1000,
       temperature: 0.7

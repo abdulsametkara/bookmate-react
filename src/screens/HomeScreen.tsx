@@ -55,9 +55,12 @@ const HomeScreen = () => {
     if (currentUserId) {
       try {
         const storageKey = `bookmate_books_${currentUserId}`;
+        console.log('🔍 HomeScreen loadBooksData - Storage key:', storageKey);
         const booksData = await AsyncStorage.getItem(storageKey);
         const loadedBooks = booksData ? JSON.parse(booksData) : [];
+        console.log('🔍 HomeScreen loadBooksData - Loaded books:', loadedBooks.length, loadedBooks.map(b => ({ title: b.title, status: b.status })));
         dispatch(setBooks(loadedBooks));
+        console.log('🔍 HomeScreen loadBooksData - Dispatched to Redux');
       } catch (error) {
         console.error('Error loading books:', error);
       }
@@ -128,10 +131,13 @@ const HomeScreen = () => {
   );
 
   // Calculate real statistics from books and reading sessions
+  console.log('🔍 HomeScreen Debug - Redux books:', books.length, 'Current User:', currentUserId);
   const userBooks = books.filter(book => book.userId === currentUserId);
+  console.log('🔍 HomeScreen Debug - User books:', userBooks.length, userBooks.map(b => ({ title: b.title, status: b.status })));
   const completedBooks = userBooks.filter(book => book.status === 'COMPLETED');
   const currentlyReadingBooks = userBooks.filter(book => book.status === 'READING');
   const totalBooks = userBooks.length;
+  console.log('🔍 HomeScreen Debug - Stats:', { total: totalBooks, completed: completedBooks.length, reading: currentlyReadingBooks.length });
   
   // Calculate total pages read
   const totalPagesRead = userBooks.reduce((total, book) => {
