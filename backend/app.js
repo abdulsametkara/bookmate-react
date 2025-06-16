@@ -125,8 +125,7 @@ app.get('/api/admin/users', async (req, res) => {
         email, 
         "displayName", 
         username,
-        "createdAt",
-        "lastLogin"
+        "createdAt"
       FROM users 
       ORDER BY "createdAt" DESC 
       LIMIT 20
