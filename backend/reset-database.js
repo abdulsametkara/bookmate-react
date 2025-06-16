@@ -15,43 +15,58 @@ async function resetDatabase() {
   try {
     console.log('🗑️ Starting database reset...');
 
-    // 1. Önce foreign key constraint'lerini göz ardı etmek için
-    await pool.query('SET session_replication_role = replica;');
+    // Delete data in correct order to respect foreign key constraints
+    console.log('🧹 Clearing all table data in correct order...');
     
-    // 2. Tüm tabloları temizle (veriler silinir, yapı korunur)
-    const tables = [
-      'shared_session_progress',
-      'shared_session_messages', 
-      'shared_reading_sessions',
-      'user_relationships',
-      'reading_sessions',
-      'user_books',
-      'wishlists',
-      'books',
-      'user_preferences',
-      'users',
-      'categories',
-      'relationship_types'
+    // Delete dependent tables first (those with foreign keys)
+    const deleteQueries = [
+      'DELETE FROM shared_session_progress',
+      'DELETE FROM shared_session_messages', 
+      'DELETE FROM shared_reading_sessions',
+      'DELETE FROM user_relationships',
+      'DELETE FROM reading_sessions',
+      'DELETE FROM user_books',
+      'DELETE FROM wishlists',
+      'DELETE FROM books',
+      'DELETE FROM user_preferences',
+      'DELETE FROM users'
+      // Don't delete categories and relationship_types - we'll keep them
     ];
 
-    console.log('🧹 Clearing all table data...');
-    
-    for (const table of tables) {
+    for (const query of deleteQueries) {
       try {
-        await pool.query(`TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`);
-        console.log(`✅ Cleared table: ${table}`);
+        const result = await pool.query(query);
+        const tableName = query.split(' FROM ')[1];
+        console.log(`✅ Cleared table: ${tableName} (${result.rowCount} rows deleted)`);
       } catch (error) {
-        console.log(`⚠️ Table ${table} might not exist or already empty`);
+        const tableName = query.split(' FROM ')[1];
+        console.log(`⚠️ Table ${tableName} might not exist or already empty:`, error.message);
       }
     }
 
-    // 3. Foreign key constraint'lerini geri aç
-    await pool.query('SET session_replication_role = DEFAULT;');
+    // Reset auto-increment sequences for tables that use SERIAL
+    console.log('🔄 Resetting ID sequences...');
+    const sequenceResets = [
+      'ALTER SEQUENCE users_id_seq RESTART WITH 1',
+      'ALTER SEQUENCE books_id_seq RESTART WITH 1',
+      'ALTER SEQUENCE reading_sessions_id_seq RESTART WITH 1',
+      'ALTER SEQUENCE categories_id_seq RESTART WITH 1',
+      'ALTER SEQUENCE shared_reading_sessions_id_seq RESTART WITH 1'
+    ];
 
-    // 4. Temel verileri yeniden ekle (kategoriler ve relationship types)
-    console.log('📝 Recreating essential data...');
+    for (const query of sequenceResets) {
+      try {
+        await pool.query(query);
+        console.log(`✅ Reset sequence: ${query.split(' ')[2]}`);
+      } catch (error) {
+        console.log(`⚠️ Sequence might not exist: ${error.message}`);
+      }
+    }
 
-    // Kategorileri yeniden ekle
+    // Ensure essential data exists (categories and relationship types)
+    console.log('📝 Ensuring essential data exists...');
+
+    // Kategorileri yeniden ekle (sadece yoksa)
     await pool.query(`
       INSERT INTO categories (name, description) VALUES
       ('Roman', 'Kurgu edebiyat eserleri'),
@@ -64,9 +79,9 @@ async function resetDatabase() {
       ('Türk Edebiyatı', 'Türk yazarların eserleri')
       ON CONFLICT (name) DO NOTHING
     `);
-    console.log('✅ Categories recreated');
+    console.log('✅ Categories ensured');
 
-    // Relationship types'ları yeniden ekle
+    // Relationship types'ları yeniden ekle (sadece yoksa)
     await pool.query(`
       INSERT INTO relationship_types (name, icon, color_code, description) VALUES
       ('okuma_arkadasi', '📚', '#4CAF50', 'Okuma arkadaşı'),
@@ -75,7 +90,7 @@ async function resetDatabase() {
       ('sevgili', '💕', '#E91E63', 'Sevgili/Eş')
       ON CONFLICT (name) DO NOTHING
     `);
-    console.log('✅ Relationship types recreated');
+    console.log('✅ Relationship types ensured');
 
     console.log('🎉 Database reset completed successfully!');
     console.log('🔄 All user data, books, and sessions have been cleared');
