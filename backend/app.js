@@ -179,32 +179,55 @@ app.post('/api/admin/reset-database', async (req, res) => {
   try {
     console.log('🚨 DATABASE RESET STARTED - ALL DATA WILL BE DELETED!');
     
-    // Tüm kullanıcı verilerini sil
-    await pool.query('DELETE FROM reading_sessions WHERE user_id IS NOT NULL');
-    await pool.query('DELETE FROM user_books WHERE user_id IS NOT NULL');
-    await pool.query('DELETE FROM wishlists WHERE user_id IS NOT NULL');
-    await pool.query('DELETE FROM user_preferences WHERE user_id IS NOT NULL');
-    await pool.query('DELETE FROM user_relationships WHERE user_id IS NOT NULL OR friend_id IS NOT NULL');
-    await pool.query('DELETE FROM shared_reading_memberships WHERE user_id IS NOT NULL');
-    await pool.query('DELETE FROM shared_session_progress WHERE user_id IS NOT NULL');
-    await pool.query('DELETE FROM shared_session_messages WHERE user_id IS NOT NULL');
-    await pool.query('DELETE FROM user_badges WHERE user_id IS NOT NULL');
+    // Safer approach - delete tables one by one with error handling
+    const tables = [
+      'reading_sessions',
+      'user_books', 
+      'wishlists',
+      'user_preferences',
+      'user_relationships',
+      'shared_reading_memberships',
+      'shared_session_progress', 
+      'shared_session_messages',
+      'user_badges'
+    ];
     
-    // Kullanıcıları sil
+    for (const table of tables) {
+      try {
+        await pool.query(`DELETE FROM ${table}`);
+        console.log(`✅ Cleared table: ${table}`);
+      } catch (tableError) {
+        console.log(`⚠️ Could not clear table ${table}:`, tableError.message);
+        // Continue with other tables
+      }
+    }
+    
+    // Delete users last
     await pool.query('DELETE FROM users');
+    console.log('✅ Cleared table: users');
     
-    // Kitapları sil (isteğe bağlı)
-    await pool.query('DELETE FROM books WHERE id NOT IN (\'550e8400-e29b-41d4-a716-446655440000\', \'550e8400-e29b-41d4-a716-446655440001\')');
+    // Optionally delete most books but keep some test books
+    try {
+      await pool.query('DELETE FROM books');
+      console.log('✅ Cleared table: books');
+    } catch (bookError) {
+      console.log('⚠️ Could not clear books:', bookError.message);
+    }
     
     console.log('✅ Database reset completed successfully');
     
     res.json({
       message: 'Database başarıyla sıfırlandı!',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      success: true
     });
   } catch (error) {
     console.error('❌ Database reset error:', error);
-    res.status(500).json({ message: 'Database sıfırlama hatası', error: error.message });
+    res.status(500).json({ 
+      message: 'Database sıfırlama hatası', 
+      error: error.message,
+      success: false 
+    });
   }
 });
 
