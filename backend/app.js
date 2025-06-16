@@ -72,8 +72,8 @@ pool.connect(async (err, client, release) => {
 
 // Database pool is set later for routes
 
-// JWT Secret - Environment variable'dan al
-const JWT_SECRET = process.env.JWT_SECRET || 'bookmate_secret_key_2025';
+// JWT Secret - Fixed for consistency
+const JWT_SECRET = 'bookmate_secret_key_2025';
 
 // JWT middleware
 const authenticateToken = (req, res, next) => {
@@ -99,7 +99,8 @@ const authenticateToken = (req, res, next) => {
 app.get('/', (req, res) => {
   res.json({ 
     message: 'BookMate API is running!',
-    version: '1.0.0',
+    version: '1.0.1',
+    status: 'JWT Secret Fixed',
           endpoints: {
         auth: '/api/auth/*',
         books: '/api/books/*',
