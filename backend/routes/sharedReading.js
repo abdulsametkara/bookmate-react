@@ -32,7 +32,7 @@ const authenticateToken = (req, res, next) => {
       id: decoded.id, 
       email: decoded.email 
     };
-    req.userId = decoded.id; // Backward compatibility için
+    req.userId = decoded.userId || decoded.id; // Backward compatibility için
     req.userEmail = decoded.email;
     next();
   } catch (error) {
