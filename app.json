@@ -38,9 +38,6 @@
       "favicon": "./assets/icon.png"
     },
     "extra": {
-      "eas": {
-        "projectId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-      },
       "useDemoMode": false,
       "openaiModel": "gpt-3.5-turbo",
       "maxTokens": 1000,

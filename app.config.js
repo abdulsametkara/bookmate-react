@@ -43,9 +43,7 @@ export default {
       favicon: "./assets/icon.png"
     },
     extra: {
-      eas: {
-        projectId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-      },
+
       // Environment variables'dan güvenli şekilde oku
       openaiApiKey: process.env.OPENAI_API_KEY || process.env.EAS_BUILD_OPENAI_API_KEY,
       googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY || process.env.EAS_BUILD_GOOGLE_BOOKS_API_KEY,
