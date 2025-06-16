@@ -20,7 +20,8 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.bookmate.reading.app",
+      bundleIdentifier: "com.bookmate.reading.v3",
+      buildNumber: "1",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
       }
@@ -43,7 +44,7 @@ export default {
     },
     extra: {
       eas: {
-        projectId: "13360e4e-4d23-4374-bc21-164f0211a046"
+        projectId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
       },
       // Environment variables'dan güvenli şekilde oku
       openaiApiKey: process.env.OPENAI_API_KEY || process.env.EAS_BUILD_OPENAI_API_KEY,
