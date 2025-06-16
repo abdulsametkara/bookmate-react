@@ -37,6 +37,7 @@
     "production": {
       "ios": {
         "appleId": "samet.3697@gmail.com",
+        "ascAppId": "6747342871",
         "bundleIdentifier": "com.bookmate.reading.v2"
       }
     }
