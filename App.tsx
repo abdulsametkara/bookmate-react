@@ -18,11 +18,8 @@ export default function App() {
       try {
         console.log('🚀 App başlatılıyor...');
         
-        // API anahtarlarını kontrol et
-        const apiKeysValid = validateApiKeys();
-        if (!apiKeysValid) {
-          console.error('❌ API anahtarları yüklenemedi! .env dosyasını kontrol edin.');
-        }
+        // API konfigürasyonunu kontrol et
+        validateApiKeys();
         
         // Clear all caches for fresh start
         await AsyncStorage.removeItem('book_covers_cache');

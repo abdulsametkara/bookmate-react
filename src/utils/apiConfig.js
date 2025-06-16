@@ -12,19 +12,8 @@ export const API_CONFIG = {
 
 // API anahtarlarının mevcut olup olmadığını kontrol et
 export const validateApiKeys = () => {
-  const { OPENAI_API_KEY, GOOGLE_BOOKS_API_KEY } = API_CONFIG;
-  
-  if (!OPENAI_API_KEY) {
-    console.warn('⚠️ OpenAI API anahtarı bulunamadı! .env dosyasını kontrol edin.');
-    return false;
-  }
-  
-  if (!GOOGLE_BOOKS_API_KEY) {
-    console.warn('⚠️ Google Books API anahtarı bulunamadı! .env dosyasını kontrol edin.');
-    return false;
-  }
-  
-  console.log('✅ API anahtarları başarıyla yüklendi!');
+  // OpenAI API key backend'de olduğu için client-side validation yapılmıyor
+  console.log('✅ API konfigürasyonu yüklendi! AI özellikler backend üzerinden çalışıyor.');
   return true;
 };
 
