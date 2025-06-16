@@ -248,31 +248,39 @@ async function initializeDatabase(dbPool = null) {
     `);
     console.log('✅ Default categories inserted');
 
-    // Insert default badges
-    await pool.query(`
-      INSERT INTO badges (name, description, icon, criteria, points, rarity) VALUES
-      ('İlk Kitap', 'İlk kitabınızı bitirdiniz!', '📖', '{"type": "books_finished", "value": 1}', 50, 'common'),
-      ('Kitap Kurdu', '10 kitap bitirdiniz!', '🐛', '{"type": "books_finished", "value": 10}', 500, 'rare'),
-      ('Okuma Maratonu', '30 gün ardı ardına okuma', '🏃‍♂️', '{"type": "reading_streak", "value": 30}', 1000, 'epic'),
-      ('İlk İnceleme', 'İlk kitap incelemenizi yazdınız', '✍️', '{"type": "reviews_written", "value": 1}', 25, 'common'),
-      ('Sosyal Okuyucu', 'İlk okuma arkadaşınızı eklediniz', '👥', '{"type": "friends_added", "value": 1}', 100, 'uncommon'),
-      ('Hızlı Okuyucu', 'Bir günde 100 sayfa okudunuz', '⚡', '{"type": "pages_per_day", "value": 100}', 200, 'uncommon'),
-      ('Gece Kuşu', 'Gece 00:00-06:00 arası okuma', '🦉', '{"type": "night_reading", "value": 1}', 75, 'common'),
-      ('Erken Kuş', 'Sabah 05:00-08:00 arası okuma', '🐦', '{"type": "morning_reading", "value": 1}', 75, 'common')
-      ON CONFLICT (name) DO NOTHING
-    `);
-    console.log('✅ Default badges inserted');
+    // Insert default badges (after badges table is created)
+    try {
+      await pool.query(`
+        INSERT INTO badges (name, description, icon, criteria, points, rarity) VALUES
+        ('İlk Kitap', 'İlk kitabınızı bitirdiniz!', '📖', '{"type": "books_finished", "value": 1}', 50, 'common'),
+        ('Kitap Kurdu', '10 kitap bitirdiniz!', '🐛', '{"type": "books_finished", "value": 10}', 500, 'rare'),
+        ('Okuma Maratonu', '30 gün ardı ardına okuma', '🏃‍♂️', '{"type": "reading_streak", "value": 30}', 1000, 'epic'),
+        ('İlk İnceleme', 'İlk kitap incelemenizi yazdınız', '✍️', '{"type": "reviews_written", "value": 1}', 25, 'common'),
+        ('Sosyal Okuyucu', 'İlk okuma arkadaşınızı eklediniz', '👥', '{"type": "friends_added", "value": 1}', 100, 'uncommon'),
+        ('Hızlı Okuyucu', 'Bir günde 100 sayfa okudunuz', '⚡', '{"type": "pages_per_day", "value": 100}', 200, 'uncommon'),
+        ('Gece Kuşu', 'Gece 00:00-06:00 arası okuma', '🦉', '{"type": "night_reading", "value": 1}', 75, 'common'),
+        ('Erken Kuş', 'Sabah 05:00-08:00 arası okuma', '🐦', '{"type": "morning_reading", "value": 1}', 75, 'common')
+        ON CONFLICT (name) DO NOTHING
+      `);
+      console.log('✅ Default badges inserted');
+    } catch (badgeError) {
+      console.log('⚠️ Badge insertion failed:', badgeError.message);
+    }
 
     // Insert default reading challenges
-    await pool.query(`
-      INSERT INTO reading_challenges (title, description, challenge_type, target_value, start_date, end_date, is_public) VALUES
-      ('2025 Okuma Hedefi', '2025 yılında 25 kitap okuma hedefi', 'books_per_year', 25, '2025-01-01', '2025-12-31', true),
-      ('Haftalık Sayfa Hedefi', 'Haftada 200 sayfa okuma', 'pages_per_week', 200, '2025-01-01', '2025-12-31', true),
-      ('Türk Edebiyatı Keşfi', '5 Türk edebiyatı eseri okuma', 'category_specific', 5, '2025-01-01', '2025-06-30', true),
-      ('Klasik Eserler', '10 klasik eser okuma', 'classic_books', 10, '2025-01-01', '2025-12-31', true)
-      ON CONFLICT (title) DO NOTHING
-    `);
-    console.log('✅ Default challenges inserted');
+    try {
+      await pool.query(`
+        INSERT INTO reading_challenges (title, description, challenge_type, target_value, start_date, end_date, is_public) VALUES
+        ('2025 Okuma Hedefi', '2025 yılında 25 kitap okuma hedefi', 'books_per_year', 25, '2025-01-01', '2025-12-31', true),
+        ('Haftalık Sayfa Hedefi', 'Haftada 200 sayfa okuma', 'pages_per_week', 200, '2025-01-01', '2025-12-31', true),
+        ('Türk Edebiyatı Keşfi', '5 Türk edebiyatı eseri okuma', 'category_specific', 5, '2025-01-01', '2025-06-30', true),
+        ('Klasik Eserler', '10 klasik eser okuma', 'classic_books', 10, '2025-01-01', '2025-12-31', true)
+        ON CONFLICT (title) DO NOTHING
+      `);
+      console.log('✅ Default challenges inserted');
+    } catch (challengeError) {
+      console.log('⚠️ Challenge insertion failed:', challengeError.message);
+    }
 
     // Migrate existing data from local database
     console.log('🔄 Migrating existing data...');
