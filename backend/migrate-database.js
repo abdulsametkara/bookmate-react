@@ -103,6 +103,26 @@ async function migrateDatabase() {
       console.log('✅ user_relationships table created');
     } else {
       console.log('✅ user_relationships table already exists');
+      
+      // Check if relationship_type_id column exists in user_relationships
+      console.log('📝 Checking for relationship_type_id column in user_relationships table...');
+      const relationshipTypeIdExists = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'user_relationships' 
+        AND column_name = 'relationship_type_id'
+      `);
+
+      if (relationshipTypeIdExists.rows.length === 0) {
+        console.log('➕ Adding relationship_type_id column to user_relationships table...');
+        await pool.query(`
+          ALTER TABLE user_relationships 
+          ADD COLUMN relationship_type_id UUID REFERENCES relationship_types(id)
+        `);
+        console.log('✅ relationship_type_id column added to user_relationships');
+      } else {
+        console.log('✅ relationship_type_id column already exists in user_relationships');
+      }
     }
 
     console.log('🎉 Database migration completed successfully!');

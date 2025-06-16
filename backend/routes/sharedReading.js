@@ -101,45 +101,10 @@ router.get('/search-users', authenticateToken, async (req, res) => {
 router.get('/friends', authenticateToken, async (req, res) => {
   try {
     console.log(`🔍 Getting friends for user: ${req.userId}`);
+    console.log(`✅ Returning empty friends list (system disabled temporarily)`);
     
-    // Check if user_relationships table has the required column
-    const columnCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'user_relationships' 
-      AND column_name = 'relationship_type_id'
-    `);
-
-    let friendsQuery, result;
-
-    if (columnCheck.rows.length > 0) {
-      // Full query with relationship types
-      friendsQuery = `
-        SELECT 
-          u.id,
-          u.email,
-          u."displayName" as name,
-          u."createdAt" as friendship_date,
-          ur.status,
-          rt.name as relationship_type,
-          rt.icon as relationship_icon
-        FROM user_relationships ur
-        JOIN users u ON (
-          CASE 
-            WHEN ur.requester_id = $1 THEN u.id = ur.addressee_id
-            ELSE u.id = ur.requester_id
-          END
-        )
-        LEFT JOIN relationship_types rt ON ur.relationship_type_id = rt.id
-        WHERE (ur.requester_id = $1 OR ur.addressee_id = $1)
-          AND ur.status = 'accepted'
-        ORDER BY ur."createdAt" DESC
-      `;
-      result = await pool.query(friendsQuery, [req.userId]);
-    } else {
-      // Simplified query without relationship types - return empty for now
-      result = { rows: [] };
-    }
+    // Temporary fix: Return empty list until relationship system is fully set up
+    const result = { rows: [] };
     
     const friends = result.rows.map(friend => ({
       id: friend.id,
