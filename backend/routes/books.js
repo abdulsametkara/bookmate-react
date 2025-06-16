@@ -222,7 +222,7 @@ router.post('/check-or-create', authenticateToken, async (req, res) => {
   }
 });
 
-// ➕ Yeni kitap ekle
+// ➕ Yeni kitap ekle (Smart - mevcut kitabı kontrol eder)
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
@@ -243,17 +243,33 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Başlık ve yazar alanları zorunludur' });
     }
     
-    // Kitabı ekle
-    const result = await pool.query(`
-      INSERT INTO books (title, author, isbn, publisher, "publishedYear", "pageCount", genre, description, cover_image_url, language)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *
-    `, [title, author, isbn, publisher, published_year, page_count, genre, description, cover_image_url, language]);
+    let book;
+    let isExisting = false;
     
-    const book = result.rows[0];
+    // ISBN varsa önce mevcut kitabı kontrol et
+    if (isbn) {
+      const existingBook = await pool.query('SELECT * FROM books WHERE isbn = $1', [isbn]);
+      if (existingBook.rows.length > 0) {
+        book = existingBook.rows[0];
+        isExisting = true;
+        console.log('📚 Using existing book:', book.title);
+      }
+    }
     
-    // Kategorileri ekle
-    if (category_ids && category_ids.length > 0) {
+    // Kitap yoksa oluştur
+    if (!book) {
+      const result = await pool.query(`
+        INSERT INTO books (title, author, isbn, publisher, "publishedYear", "pageCount", genre, description, cover_image_url, language)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `, [title, author, isbn, publisher, published_year, page_count, genre, description, cover_image_url, language]);
+      
+      book = result.rows[0];
+      console.log('📚 New book created:', book.title);
+    }
+    
+    // Kategorileri ekle (sadece yeni kitap için)
+    if (!isExisting && category_ids && category_ids.length > 0) {
       for (const categoryId of category_ids) {
         await pool.query(
           'INSERT INTO book_categories (book_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
@@ -262,9 +278,10 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     }
     
-    res.status(201).json({
-      message: 'Kitap başarıyla eklendi',
-      book
+    res.status(isExisting ? 200 : 201).json({
+      message: isExisting ? 'Mevcut kitap kullanıldı' : 'Yeni kitap oluşturuldu',
+      book,
+      isExisting
     });
   } catch (error) {
     console.error('Book create error:', error);
