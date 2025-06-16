@@ -116,6 +116,65 @@ app.get('/', (req, res) => {
 
 // 🔐 Authentication Routes
 
+// Database görüntüleme endpoint'i (sadece test için)
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id, 
+        email, 
+        "displayName", 
+        username,
+        "createdAt",
+        "lastLogin"
+      FROM users 
+      ORDER BY "createdAt" DESC 
+      LIMIT 20
+    `);
+    
+    res.json({
+      message: 'Kullanıcı listesi',
+      users: result.rows,
+      total: result.rows.length
+    });
+  } catch (error) {
+    console.error('Database query error:', error);
+    res.status(500).json({ message: 'Database error', error: error.message });
+  }
+});
+
+// Database istatistikleri endpoint'i
+app.get('/api/admin/stats', async (req, res) => {
+  try {
+    const userCount = await pool.query('SELECT COUNT(*) FROM users');
+    const bookCount = await pool.query('SELECT COUNT(*) FROM books');
+    const userBooksCount = await pool.query('SELECT COUNT(*) FROM user_books');
+    const wishlistCount = await pool.query('SELECT COUNT(*) FROM wishlists');
+    
+    // Son 5 kullanıcı
+    const recentUsers = await pool.query(`
+      SELECT id, email, "displayName", "createdAt" 
+      FROM users 
+      ORDER BY "createdAt" DESC 
+      LIMIT 5
+    `);
+    
+    res.json({
+      message: 'Database istatistikleri',
+      stats: {
+        users: parseInt(userCount.rows[0].count),
+        books: parseInt(bookCount.rows[0].count),
+        userBooks: parseInt(userBooksCount.rows[0].count),
+        wishlists: parseInt(wishlistCount.rows[0].count)
+      },
+      recentUsers: recentUsers.rows
+    });
+  } catch (error) {
+    console.error('Database stats error:', error);
+    res.status(500).json({ message: 'Database error', error: error.message });
+  }
+});
+
 // Register endpoint
 app.post('/api/auth/register', async (req, res) => {
   try {

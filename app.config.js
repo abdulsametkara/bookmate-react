@@ -21,7 +21,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.bookmate.reading.v3",
-      buildNumber: "1",
+      buildNumber: "3",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
       }
