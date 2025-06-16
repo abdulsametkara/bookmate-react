@@ -7,7 +7,6 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "OPENAI_API_KEY": "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",
         "USE_DEMO_MODE": "true",
         "NODE_ENV": "development"
       }
@@ -18,7 +17,6 @@
         "buildType": "apk"
       },
       "env": {
-        "OPENAI_API_KEY": "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",
         "USE_DEMO_MODE": "false",
         "NODE_ENV": "production"
       }
