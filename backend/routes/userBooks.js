@@ -123,7 +123,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
 // ➕ Kitabı koleksiyona ekle
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { book_id, status = 'to_read', rating, notes, is_favorite = false } = req.body;
+    const { book_id, status = 'to_read', rating, notes } = req.body;
     
     if (!book_id) {
       return res.status(400).json({ message: 'Kitap ID gerekli' });
@@ -154,7 +154,7 @@ router.post('/', authenticateToken, async (req, res) => {
         INSERT INTO user_books (user_id, book_id, status, rating, notes, is_favorite)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-      `, [req.userId, book_id, status, rating, notes, is_favorite]);
+      `, [req.userId, book_id, status, rating, notes, false]);
       
       // 2. İstek listesinden kaldır (varsa)
       const wishlistRemoved = await pool.query(`
