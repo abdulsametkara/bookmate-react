@@ -14,6 +14,9 @@ const wishlistsRouter = require('./routes/wishlists');
 const sharedReadingRouter = require('./routes/sharedReading');
 const sharedSessionsRouter = require('./routes/sharedSessions');
 
+// Admin routes
+const adminRouter = require('./routes/admin');
+
 // Database initialization
 const initializeDatabase = require('./init-database');
 
@@ -514,6 +517,9 @@ try {
 } catch (error) {
   console.error('❌ Error mounting shared reading routes:', error);
 }
+
+// Mount admin routes
+app.use('/api/admin', adminRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
