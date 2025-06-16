@@ -174,6 +174,50 @@ app.get('/api/admin/stats', async (req, res) => {
   }
 });
 
+// Database sıfırlama endpoint'i (TEHLİKELİ - SADECE TEST İÇİN)
+app.post('/api/admin/reset-database', async (req, res) => {
+  try {
+    console.log('🚨 DATABASE RESET STARTED - ALL DATA WILL BE DELETED!');
+    
+    // Tüm kullanıcı verilerini sil
+    await pool.query('DELETE FROM reading_sessions WHERE user_id IS NOT NULL');
+    await pool.query('DELETE FROM user_books WHERE user_id IS NOT NULL');
+    await pool.query('DELETE FROM wishlists WHERE user_id IS NOT NULL');
+    await pool.query('DELETE FROM user_preferences WHERE user_id IS NOT NULL');
+    await pool.query('DELETE FROM user_relationships WHERE user_id IS NOT NULL OR friend_id IS NOT NULL');
+    await pool.query('DELETE FROM shared_reading_memberships WHERE user_id IS NOT NULL');
+    await pool.query('DELETE FROM shared_session_progress WHERE user_id IS NOT NULL');
+    await pool.query('DELETE FROM shared_session_messages WHERE user_id IS NOT NULL');
+    await pool.query('DELETE FROM user_badges WHERE user_id IS NOT NULL');
+    
+    // Kullanıcıları sil
+    await pool.query('DELETE FROM users');
+    
+    // Kitapları sil (isteğe bağlı)
+    await pool.query('DELETE FROM books WHERE id NOT IN (\'550e8400-e29b-41d4-a716-446655440000\', \'550e8400-e29b-41d4-a716-446655440001\')');
+    
+    console.log('✅ Database reset completed successfully');
+    
+    res.json({
+      message: 'Database başarıyla sıfırlandı!',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Database reset error:', error);
+    res.status(500).json({ message: 'Database sıfırlama hatası', error: error.message });
+  }
+});
+
+// Test endpoint - Mobile app bağlantısını kontrol et
+app.get('/api/admin/test-connection', (req, res) => {
+  res.json({
+    message: '✅ Mobile app başarıyla backend\'e bağlandı!',
+    timestamp: new Date().toISOString(),
+    server: 'Render.com Production',
+    version: '1.0.1'
+  });
+});
+
 // Register endpoint
 app.post('/api/auth/register', async (req, res) => {
   try {
