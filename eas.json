@@ -7,7 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "USE_DEMO_MODE": "true",
+        "USE_DEMO_MODE": "false",
         "NODE_ENV": "development"
       }
     },
