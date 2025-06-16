@@ -26,9 +26,6 @@
       "android": {
         "buildType": "app-bundle"
       },
-      "ios": {
-        "bundleIdentifier": "com.bookmate.reading.v3"
-      },
       "env": {
         "OPENAI_API_KEY": "$OPENAI_API_KEY",
         "USE_DEMO_MODE": "false",
