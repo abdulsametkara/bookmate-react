@@ -26,6 +26,7 @@
         "buildType": "app-bundle"
       },
       "env": {
+        "OPENAI_API_KEY": "$OPENAI_API_KEY",
         "USE_DEMO_MODE": "false",
         "NODE_ENV": "production"
       }
