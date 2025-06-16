@@ -9,7 +9,8 @@
     "lint": "eslint . --ext .ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "init-db": "node init-database.js",
-    "migrate-db": "node migrate-database.js"
+    "migrate-db": "node migrate-database.js",
+    "reset-db": "node reset-database.js"
   },
   "keywords": [],
   "author": "",
