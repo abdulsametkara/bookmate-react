@@ -2,7 +2,7 @@
   "expo": {
     "name": "BookMate",
     "slug": "bookmate",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
@@ -18,8 +18,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bookmate.reading.app.v2",
-      "buildNumber": "10"
+      "bundleIdentifier": "com.bookmate.reading.v2",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {

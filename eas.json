@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.2.0"
+    "version": ">= 5.2.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -33,6 +34,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "samet.3697@gmail.com",
+        "ascAppId": "6747322474",
+        "bundleIdentifier": "com.bookmate.reading.v2"
+      }
+    }
   }
 }
