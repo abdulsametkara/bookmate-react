@@ -43,8 +43,8 @@ const initializeTables = async () => {
         book_author VARCHAR(255),
         book_total_pages INTEGER DEFAULT 300,
         status VARCHAR(50) NOT NULL DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (initiator_id) REFERENCES users(id)
       )
     `);
@@ -57,7 +57,7 @@ const initializeTables = async () => {
         user_id UUID NOT NULL,
         content TEXT NOT NULL,
         message_type VARCHAR(50) DEFAULT 'text',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (session_id) REFERENCES shared_reading_sessions(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
@@ -73,7 +73,7 @@ const initializeTables = async () => {
         current_page INTEGER NOT NULL DEFAULT 0,
         total_pages INTEGER NOT NULL DEFAULT 300,
         progress_percentage DECIMAL(5,2) DEFAULT 0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (session_id) REFERENCES shared_reading_sessions(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id),
         UNIQUE(session_id, user_id)
@@ -81,6 +81,25 @@ const initializeTables = async () => {
     `);
 
     console.log('✅ Shared reading tables initialized successfully');
+
+    // User relationships table for friends system
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_relationships (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        requester_id UUID NOT NULL,
+        addressee_id UUID NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'blocked')),
+        request_message TEXT,
+        responded_at TIMESTAMP,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (addressee_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(requester_id, addressee_id)
+      )
+    `);
+    console.log('✅ User relationships table created');
+
   } catch (error) {
     console.error('❌ Table initialization error:', error);
   }
@@ -102,7 +121,7 @@ router.get('/sessions', authenticateToken, async (req, res) => {
       LEFT JOIN users u ON srs.initiator_id = u.id
       WHERE srs.initiator_id = $1 
          OR $1 = ANY(srs.partner_ids)
-      ORDER BY srs.created_at DESC
+      ORDER BY srs."createdAt" DESC
     `;
     
     const result = await pool.query(sessionsQuery, [req.userId]);
@@ -116,8 +135,8 @@ router.get('/sessions', authenticateToken, async (req, res) => {
       reading_mode: session.reading_mode,
       book_id: session.book_id,
       status: session.status,
-      created_at: session.created_at,
-      updated_at: session.updated_at,
+      created_at: session.createdAt || session.created_at,
+      updated_at: session.updatedAt || session.updated_at,
       participants: [], // Will be populated by separate query if needed
       book: session.book_id ? {
         id: session.book_id,
@@ -198,8 +217,8 @@ router.get('/sessions/:sessionId', authenticateToken, async (req, res) => {
       reading_mode: session.reading_mode,
       book_id: session.book_id,
       status: session.status,
-      created_at: session.created_at,
-      updated_at: session.updated_at,
+      created_at: session.createdAt || session.created_at,
+      updated_at: session.updatedAt || session.updated_at,
       participants: participantsResult.rows.map(p => ({
         id: p.id,
         displayName: p.displayName || p.email.split('@')[0],
@@ -247,7 +266,7 @@ router.get('/sessions/:sessionId/progress', authenticateToken, async (req, res) 
       LEFT JOIN users u ON ssp.user_id = u.id
       LEFT JOIN books b ON ssp.book_id = b.id
       WHERE ssp.session_id = $1
-      ORDER BY ssp.updated_at DESC
+      ORDER BY ssp."updatedAt" DESC
     `;
     
     const result = await pool.query(progressQuery, [sessionId]);
