@@ -755,7 +755,7 @@ const LibraryScreen = () => {
             {!searchQuery && (
               <TouchableOpacity 
                 style={styles.modernAddFirstBookButton}
-                onPress={() => navigation.navigate('WishlistScreen')}
+                onPress={() => navigation.navigate('Wishlist')}
               >
                 <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
                 <Text style={styles.modernAddFirstBookText}>İlk Kitabını Ekle</Text>

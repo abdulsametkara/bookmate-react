@@ -89,6 +89,7 @@ async function initializeDatabase(dbPool = null) {
         current_page INTEGER DEFAULT 0,
         rating INTEGER CHECK (rating >= 0 AND rating <= 5),
         notes TEXT,
+        is_favorite BOOLEAN DEFAULT FALSE,
         start_date DATE,
         finish_date DATE,
         "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -187,6 +188,50 @@ async function initializeDatabase(dbPool = null) {
       )
     `);
     console.log('✅ Shared session progress table created');
+
+    // 11. Create relationship_types table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS relationship_types (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(50) UNIQUE NOT NULL,
+        icon VARCHAR(50),
+        color_code VARCHAR(7),
+        description TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Relationship types table created');
+
+    // 12. Create user_relationships table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_relationships (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        requester_id UUID NOT NULL,
+        addressee_id UUID NOT NULL,
+        relationship_type_id UUID REFERENCES relationship_types(id),
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'blocked')),
+        request_message TEXT,
+        responded_at TIMESTAMP,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (addressee_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(requester_id, addressee_id)
+      )
+    `);
+    console.log('✅ User relationships table created');
+
+    // Insert default relationship types
+    await pool.query(`
+      INSERT INTO relationship_types (name, icon, color_code, description) VALUES
+      ('okuma_arkadasi', '📚', '#4CAF50', 'Okuma arkadaşı'),
+      ('aile_uyesi', '👨‍👩‍👧‍👦', '#FF9800', 'Aile üyesi'),
+      ('okul_arkadasi', '🎓', '#2196F3', 'Okul/Üniversite arkadaşı'),
+      ('sevgili', '💕', '#E91E63', 'Sevgili/Eş')
+      ON CONFLICT (name) DO NOTHING
+    `);
+    console.log('✅ Default relationship types inserted');
 
     // Insert default categories
     await pool.query(`

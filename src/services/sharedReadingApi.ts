@@ -218,6 +218,17 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ message: 'Network error' }));
     console.log(`❌ API Error Data:`, errorData);
+    
+    // Handle 401/403 errors (token issues)
+    if (response.status === 401 || response.status === 403) {
+      console.log('🔑 Authentication error detected, clearing auth data...');
+      await AsyncStorage.multiRemove([
+        'bookmate_auth_token',
+        'user', 
+        'bookmate_current_session'
+      ]);
+    }
+    
     throw new Error(errorData.message || `HTTP ${response.status}`);
   }
 

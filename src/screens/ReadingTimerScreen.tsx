@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -48,7 +48,7 @@ const ReadingTimerScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useAppDispatch();
-  const { toasts, showSuccess, showError, showInfo, hideToast } = useToast();
+  const { showToast, success: showSuccess, error: showError, info: showInfo } = useToast();
   const intervalRef = useRef(null);
   const appState = useRef(AppState.currentState);
   
@@ -456,7 +456,7 @@ const ReadingTimerScreen = () => {
 
   const startTimer = async () => {
     if (!selectedBook) {
-      showError('Hata', 'Lütfen önce bir kitap seçin');
+      showError('Lütfen önce bir kitap seçin');
       return;
     }
 
@@ -473,7 +473,7 @@ const ReadingTimerScreen = () => {
       setIsRunning(true);
       setIsPaused(false);
       
-      showSuccess('Başarılı', 'Okuma oturumu başlatıldı! 📚');
+      showSuccess('Okuma oturumu başlatıldı! 📚');
       console.log('Timer started with session ID:', sessionId);
     } catch (error) {
       console.error('Error starting timer:', error);
@@ -1014,17 +1014,7 @@ const ReadingTimerScreen = () => {
         </View>
       </Modal>
       
-      {/* Custom Toasts */}
-      {toasts.map((toast) => (
-        <CustomToast
-          key={toast.id}
-          visible={toast.visible}
-          message={toast.message}
-          type={toast.type}
-          duration={toast.duration}
-          onHide={() => hideToast(toast.id)}
-        />
-      ))}
+      {/* Custom Toast already handled by useToast hook */}
     </View>
   );
 };

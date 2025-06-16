@@ -1,13 +1,8 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 
-// API URL'leri - Development vs Production
-const API_URL = Platform.select({
-  android: __DEV__ ? 'http://10.0.2.2:5000/api' : 'https://bookmate-react.onrender.com/api', // Production için Render URL
-  ios: __DEV__ ? 'http://localhost:5000/api' : 'https://bookmate-react.onrender.com/api', // Production için Render URL  
-  default: __DEV__ ? 'http://localhost:5000/api' : 'https://bookmate-react.onrender.com/api', // Production için Render URL
-});
+// API URL'leri - Always use Production (Render.com)
+const API_URL = 'https://bookmate-react.onrender.com/api';
 
 // Axios instance
 const api: AxiosInstance = axios.create({

@@ -4,11 +4,17 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  database: 'bookmate_db',
-  user: 'postgres',
-  password: '246595'
+  // DATABASE_URL varsa onu kullan (Production), yoksa local config (Development)
+  connectionString: process.env.DATABASE_URL || undefined,
+  // Local development config
+  host: process.env.DATABASE_URL ? undefined : 'localhost',
+  port: process.env.DATABASE_URL ? undefined : 5432,
+  database: process.env.DATABASE_URL ? undefined : 'bookmate_db',
+  user: process.env.DATABASE_URL ? undefined : 'postgres',
+  password: process.env.DATABASE_URL ? undefined : '246595',
+  // Production için SSL gerekli, development için değil
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 10000,
 });
 
 const JWT_SECRET = 'bookmate_secret_key_2025';

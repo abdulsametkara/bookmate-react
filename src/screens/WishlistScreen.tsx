@@ -197,9 +197,16 @@ const WishlistScreen = () => {
     
     setIsSearching(true);
     try {
+      // Add timeout controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10&langRestrict=tr`
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10&langRestrict=tr`,
+        { signal: controller.signal }
       );
+      
+      clearTimeout(timeoutId);
       const data = await response.json();
       
       if (data.items) {
@@ -208,11 +215,15 @@ const WishlistScreen = () => {
         console.log('📚 Arama sonuçları:', data.items.length, 'kitap bulundu');
       } else {
         setSearchResults([]);
-        showToast('info', 'Aradığınız kitap bulunamadı.');
+        showToast('info', 'Aradığınız kitap bulunamadı. Farklı kelimeler deneyin.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Arama hatası:', error);
-      showToast('error', 'Kitap arama sırasında bir hata oluştu.');
+      if (error.name === 'AbortError') {
+        showToast('error', 'Arama zaman aşımına uğradı. İnternet bağlantınızı kontrol edin.');
+      } else {
+        showToast('error', 'Kitap arama sırasında bir hata oluştu. Tekrar deneyin.');
+      }
     } finally {
       setIsSearching(false);
     }
@@ -248,11 +259,18 @@ const WishlistScreen = () => {
 
       console.log('📚 Backend\'e kitap ekleniyor:', bookData.title);
 
-      const bookResponse = await fetch(getApiUrl('/api/books/check-or-create'), {
+      // Add timeout for backend API calls
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const bookResponse = await fetch(getApiUrl('/api/books'), {
         method: 'POST',
         headers: getAuthHeaders(token),
         body: JSON.stringify(bookData),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       let bookId: string;
 
@@ -316,9 +334,15 @@ const WishlistScreen = () => {
         showToast('error', errorData.message || 'İstek listesine eklenirken bir hata oluştu.');
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ İstek listesine ekleme hatası:', error);
-      showToast('error', 'İstek listesine eklerken bir hata oluştu.');
+      if (error.name === 'AbortError') {
+        showToast('error', 'İşlem zaman aşımına uğradı. Backend sunucusu çalışmıyor olabilir.');
+      } else if (error.message?.includes('Network request failed')) {
+        showToast('error', 'İnternet bağlantınızı kontrol edin.');
+      } else {
+        showToast('error', 'İstek listesine eklerken bir hata oluştu. Backend sunucusu çalışmıyor olabilir.');
+      }
     }
   };
 

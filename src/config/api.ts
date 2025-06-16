@@ -2,11 +2,7 @@
 import { Platform } from 'react-native';
 
 export const API_CONFIG = {
-  BASE_URL: Platform.select({
-    android: __DEV__ ? 'http://10.0.2.2:5000' : 'https://bookmate-react.onrender.com', // Production için Render URL
-    ios: __DEV__ ? 'http://localhost:5000' : 'https://bookmate-react.onrender.com', // Production için Render URL
-    default: __DEV__ ? 'http://localhost:5000' : 'https://bookmate-react.onrender.com', // Production için Render URL
-  }),
+  BASE_URL: 'https://bookmate-react.onrender.com', // Always use Render production backend
   ENDPOINTS: {
     AUTH: {
       BASE: '/api/auth',
