@@ -39,7 +39,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "13360e4e-4d23-4374-bc21-164f0211a046"
+        "projectId": "bookmate-v3-fresh"
       },
       "useDemoMode": false,
       "openaiModel": "gpt-3.5-turbo",
