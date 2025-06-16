@@ -241,6 +241,31 @@ app.get('/api/admin/test-connection', (req, res) => {
   });
 });
 
+// Manual database initialization endpoint
+app.post('/api/admin/init-tables', async (req, res) => {
+  try {
+    console.log('🔄 Manual database initialization started...');
+    
+    const initializeDatabase = require('./init-database');
+    await initializeDatabase(pool);
+    
+    console.log('✅ Manual database initialization completed');
+    
+    res.json({
+      message: '✅ Database tabloları başarıyla oluşturuldu!',
+      timestamp: new Date().toISOString(),
+      success: true
+    });
+  } catch (error) {
+    console.error('❌ Manual database init error:', error);
+    res.status(500).json({ 
+      message: 'Database initialization hatası', 
+      error: error.message,
+      success: false 
+    });
+  }
+});
+
 // Register endpoint
 app.post('/api/auth/register', async (req, res) => {
   try {
